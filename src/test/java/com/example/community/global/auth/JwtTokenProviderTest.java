@@ -9,7 +9,8 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 public class JwtTokenProviderTest {
-    private final JwtTokenProvider jwtTokenProvider = new JwtTokenProvider("imwkRwkiiytrPM7KLs3up4f9tf/8ijVSmvxHHp69AU0=", 3000L, 6000L);
+    private static final String TEST_SECRET = "Y29tbXVuaXR5LXRlc3Qtb25seS1qd3Qtc2lnbmluZy1rZXktMjAyNg==";
+    private final JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(TEST_SECRET, 3000L, 6000L);
 
     @Test
     @DisplayName("JWT 토큰을 생성할 수 있다.")
@@ -50,7 +51,7 @@ public class JwtTokenProviderTest {
     @Test
     @DisplayName("만료된 토큰은 유효하지 않음.")
     void expiredTokenTest() throws InterruptedException {
-        JwtTokenProvider shortProvider = new JwtTokenProvider("imwkRwkiiytrPM7KLs3up4f9tf/8ijVSmvxHHp69AU0=", 0L, 1000L);
+        JwtTokenProvider shortProvider = new JwtTokenProvider(TEST_SECRET, 0L, 1000L);
         User user = new User(1L, "test", "", UserRole.ROLE_USER, UserStatus.ACTIVE);
         JwtToken token = shortProvider.createJwtToken(user);
         assertThat(jwtTokenProvider.validateToken(token.getAccessToken())).isFalse();
