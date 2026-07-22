@@ -11,6 +11,7 @@ import com.example.community.global.config.filter.JwtFilter;
 import com.example.community.global.dto.AuthorDTO;
 import com.example.community.global.exceptions.ContentNotFoundException;
 import com.example.community.global.exceptions.ForbiddenException;
+import com.example.community.global.exceptions.InvalidInputException;
 import com.example.community.user.entity.UserStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -50,6 +52,7 @@ public class CommentControllerTest {
             new AuthorDTO(UserStatus.ACTIVE, "commenter", ""),
             new CommentDTO(
                     1L,
+                    null,
                     "test comment",
                     LocalDateTime.of(2026, 7, 7, 12, 0),
                     false,
@@ -82,10 +85,49 @@ public class CommentControllerTest {
                 .andExpect(jsonPath("$.message").value("comment_create_success"))
                 .andExpect(jsonPath("$.data.author.nickname").value("commenter"))
                 .andExpect(jsonPath("$.data.comment.commentId").value(1L))
+                .andExpect(jsonPath("$.data.comment.parentCommentId").value(nullValue()))
                 .andExpect(jsonPath("$.data.comment.commentBody").value("test comment"))
                 .andExpect(jsonPath("$.data.comment.modified").value(false))
                 .andExpect(jsonPath("$.data.comment.deleted").value(false));
-        verify(commentService).uploadComment(eq(1L), eq(1L), argThat(request -> request.getCommentBody().equals("test comment")));
+        verify(commentService).uploadComment(eq(1L), eq(1L), argThat(request ->
+                request.getCommentBody().equals("test comment") && request.getParentCommentId() == null
+        ));
+    }
+
+    @Test
+    @DisplayName("대댓글 작성 요청과 응답에 직접 부모 ID를 사용한다.")
+    void uploadReplyComment_withParentCommentId() throws Exception {
+        CommentResponseDTO replyResponse = new CommentResponseDTO(
+                new AuthorDTO(UserStatus.ACTIVE, "commenter", ""),
+                new CommentDTO(
+                        2L,
+                        1L,
+                        "reply",
+                        LocalDateTime.of(2026, 7, 7, 12, 1),
+                        false,
+                        null,
+                        false,
+                        null
+                )
+        );
+        when(commentService.uploadComment(anyLong(), anyLong(), any(CommentRequestDTO.class))).thenReturn(replyResponse);
+
+        mockMvc.perform(post("/api/posts/1/comments").with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "commentBody": "reply",
+                                    "parentCommentId": 1
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.message").value("comment_create_success"))
+                .andExpect(jsonPath("$.data.comment.commentId").value(2L))
+                .andExpect(jsonPath("$.data.comment.parentCommentId").value(1L));
+
+        verify(commentService).uploadComment(eq(1L), eq(1L), argThat(request ->
+                request.getCommentBody().equals("reply") && request.getParentCommentId().equals(1L)
+        ));
     }
     @Test
     @DisplayName("빈 댓글은 400")
@@ -133,6 +175,24 @@ public class CommentControllerTest {
     }
 
     @Test
+    @DisplayName("삭제된 부모 댓글에 답글을 작성하면 400")
+    void uploadComment_deletedParent_returns400() throws Exception {
+        doThrow(new InvalidInputException()).when(commentService).uploadComment(eq(1L), eq(1L), any(CommentRequestDTO.class));
+
+        mockMvc.perform(post("/api/posts/1/comments")
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "commentBody": "reply",
+                                    "parentCommentId": 2
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("invalid_input"));
+    }
+
+    @Test
     @DisplayName("댓글 목록 조회 성공 시 200")
     void getComments_success_returns200() throws Exception {
         when(commentService.getComments(1L)).thenReturn(List.of(responseDTO));
@@ -143,6 +203,7 @@ public class CommentControllerTest {
                 .andExpect(jsonPath("$.message").value("comments_get_success"))
                 .andExpect(jsonPath("$.data[0].author.nickname").value("commenter"))
                 .andExpect(jsonPath("$.data[0].comment.commentId").value(1L))
+                .andExpect(jsonPath("$.data[0].comment.parentCommentId").value(nullValue()))
                 .andExpect(jsonPath("$.data[0].comment.commentBody").value("test comment"))
                 .andExpect(jsonPath("$.data[0].comment.modified").value(false))
                 .andExpect(jsonPath("$.data[0].comment.deleted").value(false));
@@ -178,6 +239,7 @@ public class CommentControllerTest {
                 new AuthorDTO(UserStatus.ACTIVE, "commenter", ""),
                 new CommentDTO(
                         1L,
+                        null,
                         "modified comment",
                         LocalDateTime.of(2026, 7, 7, 12, 0),
                         true,

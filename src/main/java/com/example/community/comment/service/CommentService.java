@@ -10,6 +10,7 @@ import com.example.community.comment.repository.CommentRepository;
 import com.example.community.global.auth.AuthValidator;
 import com.example.community.global.dto.AuthorDTO;
 import com.example.community.global.exceptions.ContentNotFoundException;
+import com.example.community.global.exceptions.InvalidInputException;
 import com.example.community.global.exceptions.NotRegisteredException;
 import com.example.community.global.mapper.AuthorMapper;
 import com.example.community.post.entity.Post;
@@ -49,7 +50,14 @@ public class CommentService {
     public CommentResponseDTO uploadComment(Long postId, Long authorId, @Valid CommentRequestDTO commentRequestDTO) {
         User author = userRepository.findById(authorId).orElseThrow(NotRegisteredException::new);
         Post post = postRepository.findById(postId).orElseThrow(ContentNotFoundException::new);
-        Comment comment = commentFactory.create(author, post, null, commentRequestDTO);
+        Comment parentComment = null;
+        if (commentRequestDTO.getParentCommentId() != null) {
+            parentComment = commentRepository.findCommentWithPost(postId, commentRequestDTO.getParentCommentId()).orElseThrow(ContentNotFoundException::new);
+            if (parentComment.isDeleted()) {
+                throw new InvalidInputException();
+            }
+        }
+        Comment comment = commentFactory.create(author, post, parentComment, commentRequestDTO);
         commentRepository.save(comment);
         post.increaseComments();
         return new CommentResponseDTO(authorMapper.toAuthorDTO(author), toCommentDTO(comment));
@@ -94,6 +102,7 @@ public class CommentService {
     private CommentDTO toCommentDTO(Comment comment) {
         return new CommentDTO(
                 comment.getCommentId(),
+                comment.getParentComment() == null ? null : comment.getParentComment().getCommentId(),
                 comment.getCommentBody(),
                 comment.getCreatedAt(),
                 comment.isModified(),

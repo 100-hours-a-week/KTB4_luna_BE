@@ -11,6 +11,7 @@ import com.example.community.global.auth.JwtToken;
 import com.example.community.global.dto.AuthorDTO;
 import com.example.community.global.exceptions.ContentNotFoundException;
 import com.example.community.global.exceptions.ForbiddenException;
+import com.example.community.global.exceptions.InvalidInputException;
 import com.example.community.global.exceptions.NotRegisteredException;
 import com.example.community.global.mapper.AuthorMapper;
 import com.example.community.post.entity.Post;
@@ -89,7 +90,107 @@ public class CommentServiceTest {
 
         CommentResponseDTO response = commentService.uploadComment(post.getPostId(),commenter.getUserId(), commentRequestDTO);
         assertThat(response.getComment().getCommentBody()).isEqualTo("test comment");
+        assertThat(response.getComment().getParentCommentId()).isNull();
         assertThat(post.getComments()).isEqualTo(1);
+        verify(commentRepository, never()).findCommentWithPost(anyLong(), anyLong());
+    }
+
+    @Test
+    @DisplayName("같은 부모에 여러 대댓글을 작성하고 대댓글에도 답글을 작성할 수 있다.")
+    void uploadComment_allowsMultipleChildrenAndNestedReply() {
+        Comment parent = new Comment(commenter, post, null, "parent comment");
+        ReflectionTestUtils.setField(parent, "commentId", 10L);
+        Comment firstReply = new Comment(commenter, post, parent, "first reply");
+        ReflectionTestUtils.setField(firstReply, "commentId", 11L);
+        Comment secondReply = new Comment(commenter, post, parent, "second reply");
+        ReflectionTestUtils.setField(secondReply, "commentId", 12L);
+        Comment nestedReply = new Comment(commenter, post, firstReply, "nested reply");
+        ReflectionTestUtils.setField(nestedReply, "commentId", 13L);
+
+        CommentRequestDTO firstRequest = commentRequest("first reply", parent.getCommentId());
+        CommentRequestDTO secondRequest = commentRequest("second reply", parent.getCommentId());
+        CommentRequestDTO nestedRequest = commentRequest("nested reply", firstReply.getCommentId());
+
+        when(userRepository.findById(commenter.getUserId())).thenReturn(Optional.of(commenter));
+        when(postRepository.findById(post.getPostId())).thenReturn(Optional.of(post));
+        when(commentRepository.findCommentWithPost(post.getPostId(), parent.getCommentId())).thenReturn(Optional.of(parent));
+        when(commentRepository.findCommentWithPost(post.getPostId(), firstReply.getCommentId())).thenReturn(Optional.of(firstReply));
+        when(commentFactory.create(commenter, post, parent, firstRequest)).thenReturn(firstReply);
+        when(commentFactory.create(commenter, post, parent, secondRequest)).thenReturn(secondReply);
+        when(commentFactory.create(commenter, post, firstReply, nestedRequest)).thenReturn(nestedReply);
+
+        CommentResponseDTO firstResponse = commentService.uploadComment(post.getPostId(), commenter.getUserId(), firstRequest);
+        CommentResponseDTO secondResponse = commentService.uploadComment(post.getPostId(), commenter.getUserId(), secondRequest);
+        CommentResponseDTO nestedResponse = commentService.uploadComment(post.getPostId(), commenter.getUserId(), nestedRequest);
+
+        assertThat(firstReply.getParentComment()).isSameAs(parent);
+        assertThat(secondReply.getParentComment()).isSameAs(parent);
+        assertThat(nestedReply.getParentComment()).isSameAs(firstReply);
+        assertThat(firstResponse.getComment().getParentCommentId()).isEqualTo(parent.getCommentId());
+        assertThat(secondResponse.getComment().getParentCommentId()).isEqualTo(parent.getCommentId());
+        assertThat(nestedResponse.getComment().getParentCommentId()).isEqualTo(firstReply.getCommentId());
+        assertThat(post.getComments()).isEqualTo(3);
+        verify(commentRepository, times(2)).findCommentWithPost(post.getPostId(), parent.getCommentId());
+        verify(commentRepository).findCommentWithPost(post.getPostId(), firstReply.getCommentId());
+        verify(commentRepository).save(firstReply);
+        verify(commentRepository).save(secondReply);
+        verify(commentRepository).save(nestedReply);
+    }
+
+    @Test
+    @DisplayName("부모 댓글이 존재하지 않으면 저장하지 않고 404")
+    void uploadComment_parentNotFound_doesNotSaveOrIncreaseCount() {
+        CommentRequestDTO request = commentRequest("reply", 999L);
+        when(userRepository.findById(commenter.getUserId())).thenReturn(Optional.of(commenter));
+        when(postRepository.findById(post.getPostId())).thenReturn(Optional.of(post));
+        when(commentRepository.findCommentWithPost(post.getPostId(), 999L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> commentService.uploadComment(post.getPostId(), commenter.getUserId(), request))
+                .isInstanceOf(ContentNotFoundException.class);
+
+        assertThat(post.getComments()).isZero();
+        verify(commentFactory, never()).create(any(), any(), any(), any());
+        verify(commentRepository, never()).save(any(Comment.class));
+    }
+
+    @Test
+    @DisplayName("다른 게시글의 댓글은 부모로 지정할 수 없고 저장하지 않는다.")
+    void uploadComment_parentFromAnotherPost_doesNotSaveOrIncreaseCount() {
+        Post otherPost = new Post(author, "other", "other body", "");
+        ReflectionTestUtils.setField(otherPost, "postId", 2L);
+        Comment otherPostComment = new Comment(commenter, otherPost, null, "other post comment");
+        ReflectionTestUtils.setField(otherPostComment, "commentId", 20L);
+        CommentRequestDTO request = commentRequest("reply", otherPostComment.getCommentId());
+        when(userRepository.findById(commenter.getUserId())).thenReturn(Optional.of(commenter));
+        when(postRepository.findById(post.getPostId())).thenReturn(Optional.of(post));
+        when(commentRepository.findCommentWithPost(post.getPostId(), otherPostComment.getCommentId())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> commentService.uploadComment(post.getPostId(), commenter.getUserId(), request))
+                .isInstanceOf(ContentNotFoundException.class);
+
+        assertThat(post.getComments()).isZero();
+        verify(commentRepository).findCommentWithPost(post.getPostId(), otherPostComment.getCommentId());
+        verify(commentFactory, never()).create(any(), any(), any(), any());
+        verify(commentRepository, never()).save(any(Comment.class));
+    }
+
+    @Test
+    @DisplayName("삭제된 댓글은 부모로 지정할 수 없고 저장하지 않는다.")
+    void uploadComment_deletedParent_doesNotSaveOrIncreaseCount() {
+        Comment deletedParent = new Comment(commenter, post, null, "deleted parent");
+        ReflectionTestUtils.setField(deletedParent, "commentId", 30L);
+        deletedParent.delete();
+        CommentRequestDTO request = commentRequest("reply", deletedParent.getCommentId());
+        when(userRepository.findById(commenter.getUserId())).thenReturn(Optional.of(commenter));
+        when(postRepository.findById(post.getPostId())).thenReturn(Optional.of(post));
+        when(commentRepository.findCommentWithPost(post.getPostId(), deletedParent.getCommentId())).thenReturn(Optional.of(deletedParent));
+
+        assertThatThrownBy(() -> commentService.uploadComment(post.getPostId(), commenter.getUserId(), request))
+                .isInstanceOf(InvalidInputException.class);
+
+        assertThat(post.getComments()).isZero();
+        verify(commentFactory, never()).create(any(), any(), any(), any());
+        verify(commentRepository, never()).save(any(Comment.class));
     }
 
     @Test
@@ -132,23 +233,30 @@ public class CommentServiceTest {
     @Test
     @DisplayName("댓글 조회 성공")
     void getCommentList_success(){
+        Comment reply = new Comment(commenter, post, comment, "reply");
+        ReflectionTestUtils.setField(reply, "commentId", 2L);
+        Comment nestedReply = new Comment(commenter, post, reply, "nested reply");
+        ReflectionTestUtils.setField(nestedReply, "commentId", 3L);
         when(postRepository.findById(post.getPostId())).thenReturn(Optional.of(post));
-        when(commentRepository.findListByPost(post.getPostId())).thenReturn(List.of(comment));
+        when(commentRepository.findListByPost(post.getPostId())).thenReturn(List.of(comment, reply, nestedReply));
         when(userRepository.findById(commenter.getUserId())).thenReturn(Optional.of(commenter));
         when(authorMapper.toAuthorDTO(commenter)).thenReturn(new AuthorDTO(UserStatus.ACTIVE, "commenter", ""));
 
         List<CommentResponseDTO> response = commentService.getComments(post.getPostId());
 
-        assertThat(response).hasSize(1);
+        assertThat(response).hasSize(3);
         assertThat(response.get(0).getAuthor().getNickname()).isEqualTo("commenter");
         assertThat(response.get(0).getComment().getCommentId()).isEqualTo(comment.getCommentId());
+        assertThat(response.get(0).getComment().getParentCommentId()).isNull();
         assertThat(response.get(0).getComment().getCommentBody()).isEqualTo("test comment");
         assertThat(response.get(0).getComment().isModified()).isFalse();
         assertThat(response.get(0).getComment().isDeleted()).isFalse();
+        assertThat(response.get(1).getComment().getParentCommentId()).isEqualTo(comment.getCommentId());
+        assertThat(response.get(2).getComment().getParentCommentId()).isEqualTo(reply.getCommentId());
 
         verify(postRepository).findById(post.getPostId());
         verify(commentRepository).findListByPost(post.getPostId());
-        verify(userRepository).findById(commenter.getUserId());
+        verify(userRepository, times(3)).findById(commenter.getUserId());
     }
 
     @Test
@@ -164,13 +272,21 @@ public class CommentServiceTest {
     @Test
     @DisplayName("댓글 수정 성공")
     void modifyComment_success(){
+        Comment originalParent = new Comment(commenter, post, null, "original parent");
+        ReflectionTestUtils.setField(originalParent, "commentId", 10L);
+        Comment reply = new Comment(commenter, post, originalParent, "test comment");
+        ReflectionTestUtils.setField(reply, "commentId", 1L);
+        modifyRequestDTO.setParentCommentId(11L);
         when(postRepository.findById(anyLong())).thenReturn(Optional.of(post));
         when(userRepository.findById(2L)).thenReturn(Optional.of(commenter));
-        when(commentRepository.findCommentWithPost(anyLong(), anyLong())).thenReturn(Optional.of(comment));
+        when(commentRepository.findCommentWithPost(post.getPostId(), reply.getCommentId())).thenReturn(Optional.of(reply));
 
-        CommentResponseDTO response = commentService.modifyComment(1L, 1L, 2L, modifyRequestDTO);
+        CommentResponseDTO response = commentService.modifyComment(post.getPostId(), reply.getCommentId(), commenter.getUserId(), modifyRequestDTO);
         assertThat(response.getComment().getCommentBody()).isEqualTo("modified comment");
-        assertThat(comment.isModified()).isTrue();
+        assertThat(response.getComment().getParentCommentId()).isEqualTo(originalParent.getCommentId());
+        assertThat(reply.isModified()).isTrue();
+        assertThat(reply.getParentComment()).isSameAs(originalParent);
+        verify(commentRepository, never()).findCommentWithPost(post.getPostId(), modifyRequestDTO.getParentCommentId());
     }
     @Test
     @DisplayName("댓글 작성자가 아니면 수정 요청 시 403")
@@ -252,5 +368,12 @@ public class CommentServiceTest {
         ).isInstanceOf(ContentNotFoundException.class);
 
         verify(authValidator, never()).validateOwner(anyLong(), anyLong());
+    }
+
+    private CommentRequestDTO commentRequest(String commentBody, Long parentCommentId) {
+        CommentRequestDTO requestDTO = new CommentRequestDTO();
+        requestDTO.setCommentBody(commentBody);
+        requestDTO.setParentCommentId(parentCommentId);
+        return requestDTO;
     }
 }

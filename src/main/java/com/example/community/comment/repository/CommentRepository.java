@@ -11,7 +11,7 @@ import java.util.*;
 
 @Repository
 public interface CommentRepository extends JpaRepository<Comment, Long> {
-    @EntityGraph(attributePaths = "author")
+    @EntityGraph(attributePaths = {"author", "parentComment"})
     @Query("""
         select c
         from Comment c
@@ -20,7 +20,7 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     """)
     List<Comment> findListByPost(@Param("postId") long postId);
 
-    @EntityGraph(attributePaths = {"author", "post"})
+    @EntityGraph(attributePaths = {"author", "post", "parentComment"})
     @Query("""
         select c
         from Comment c
