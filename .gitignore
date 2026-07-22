@@ -36,3 +36,8 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Local development ###
+.DS_Store
+database.mv.db
+database.trace.db
