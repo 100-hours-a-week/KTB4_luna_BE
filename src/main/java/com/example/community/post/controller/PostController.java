@@ -1,6 +1,7 @@
 package com.example.community.post.controller;
 
 import com.example.community.global.ApiResponse;
+import com.example.community.global.exceptions.InvalidInputException;
 import com.example.community.post.dto.*;
 import com.example.community.post.service.PostService;
 import com.example.community.user.entity.UserRole;
@@ -10,8 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController()
 @RequestMapping("/api/posts")
@@ -27,9 +26,13 @@ public class PostController {
         return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>("post_create_success", responseDTO));
     }
     @GetMapping()
-    public ResponseEntity<ApiResponse<List<PostListResponseDTO>>> getPostList(Authentication authentication){
-        List<PostListResponseDTO> listResponse = postService.getPostList();
-        return ResponseEntity.status(HttpStatus.OK).body(new ApiResponse<>("posts_loading_success", listResponse));
+    public ResponseEntity<ApiResponse<PostPageResponseDTO>> getPostList(
+            Authentication authentication,
+            @RequestParam(defaultValue = "0") int page
+    ){
+        if (page < 0) throw new InvalidInputException();
+        PostPageResponseDTO responseDTO = postService.getPostList(page);
+        return ResponseEntity.status(HttpStatus.OK).body(new ApiResponse<>("posts_loading_success", responseDTO));
     }
     @GetMapping("/{postId}")
     public ResponseEntity<ApiResponse<PostDetailResponseDTO>> getPostDetail(Authentication authentication, @PathVariable("postId") Long postId){
