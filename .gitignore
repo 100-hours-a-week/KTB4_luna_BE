@@ -41,4 +41,8 @@ out/
 .DS_Store
 database.mv.db
 database.trace.db
+/database-benchmark-*.mv.db
 /application-local.properties
+
+### Generated datasets ###
+/tools/dataset/output/
