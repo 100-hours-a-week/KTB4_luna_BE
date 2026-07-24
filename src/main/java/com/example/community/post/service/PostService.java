@@ -17,15 +17,16 @@ import com.example.community.user.entity.User;
 import com.example.community.user.entity.UserRole;
 import com.example.community.user.repository.UserRepository;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
-import java.util.List;
-
 @Service
 @Validated
 public class PostService {
+    private static final int POST_PAGE_SIZE = 20;
     private final PostRepository postRepository;
     private final AuthValidator authValidator;
     private final UserRepository userRepository;
@@ -64,11 +65,22 @@ public class PostService {
 
     // ----------------------------------- 게시물 목록 조회 -----------------------------------
     @Transactional(readOnly = true)
-    public List<PostListResponseDTO> getPostList(){
-        return postRepository.findByStatusNot(PostStatus.DELETED)
-                .stream()
+    public PostPageResponseDTO getPostList(int page){
+        if (page < 0) throw new InvalidInputException();
+
+        Page<Post> postPage = postRepository.findByStatusNot(
+                PostStatus.DELETED,
+                PageRequest.of(page, POST_PAGE_SIZE)
+        );
+        return new PostPageResponseDTO(
+                postPage.getContent().stream()
                 .map(this::toPostListResponseDTO)
-                .toList();
+                .toList(),
+                postPage.getNumber(),
+                postPage.getSize(),
+                postPage.getTotalElements(),
+                postPage.getTotalPages()
+        );
     }
 
     // ----------------------------------- 게시물 상세 조회 -----------------------------------
