@@ -23,6 +23,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.List;
+
 @Service
 @Validated
 public class PostService {
@@ -72,10 +74,12 @@ public class PostService {
                 PostStatus.DELETED,
                 PageRequest.of(page, POST_PAGE_SIZE)
         );
-        return new PostPageResponseDTO(
-                postPage.getContent().stream()
+        List<PostListResponseDTO> posts = postPage.getContent().stream()
                 .map(this::toPostListResponseDTO)
-                .toList(),
+                .toList();
+
+        return new PostPageResponseDTO(
+                posts,
                 postPage.getNumber(),
                 postPage.getSize(),
                 postPage.getTotalElements(),

@@ -15,9 +15,9 @@ import java.util.Optional;
 @Repository
 public interface PostRepository extends JpaRepository<Post,Long> {
     @Query(value = """
-        select p 
+        select p
         from Post p
-        join fetch p.author
+        left join fetch p.author
         where p.status <> :status
         order by p.createdAt desc, p.postId desc
     """, countQuery = """
