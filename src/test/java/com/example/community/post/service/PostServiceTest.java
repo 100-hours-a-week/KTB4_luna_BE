@@ -25,6 +25,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -35,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class PostServiceTest {
 
     @Mock
@@ -125,12 +130,43 @@ class PostServiceTest {
     @DisplayName("블라인드 게시글은 숨김 제목으로 목록에 반환된다.")
     void getPostList_blindedPostReturnsHiddenTitle() {
         post.blindPost();
-        when(postRepository.findByStatusNot(PostStatus.DELETED)).thenReturn(List.of(post));
+        when(postRepository.findByStatusNot(PostStatus.DELETED, PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(post), PageRequest.of(0, 20), 1));
 
-        List<PostListResponseDTO> result = postService.getPostList();
+        PostPageResponseDTO result = postService.getPostList(0);
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).getPost().getTitle()).isEqualTo("숨김 처리된 게시글");
+        assertThat(result.getPosts()).hasSize(1);
+        assertThat(result.getPosts().get(0).getPost().getTitle()).isEqualTo("숨김 처리된 게시글");
+        assertThat(result.getPage()).isZero();
+        assertThat(result.getSize()).isEqualTo(20);
+        assertThat(result.getTotalElements()).isEqualTo(1);
+        assertThat(result.getTotalPages()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("게시글 목록은 요청 페이지를 20개 고정 크기로 조회한다.")
+    void getPostList_usesFixedPageSize() {
+        Pageable pageable = PageRequest.of(1, 20);
+        when(postRepository.findByStatusNot(PostStatus.DELETED, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 21));
+
+        PostPageResponseDTO result = postService.getPostList(1);
+
+        assertThat(result.getPosts()).isEmpty();
+        assertThat(result.getPage()).isEqualTo(1);
+        assertThat(result.getSize()).isEqualTo(20);
+        assertThat(result.getTotalElements()).isEqualTo(21);
+        assertThat(result.getTotalPages()).isEqualTo(2);
+        verify(postRepository).findByStatusNot(PostStatus.DELETED, pageable);
+    }
+
+    @Test
+    @DisplayName("게시글 목록의 page가 음수이면 조회하지 않는다.")
+    void getPostList_negativePageThrowsException() {
+        assertThatThrownBy(() -> postService.getPostList(-1))
+                .isInstanceOf(InvalidInputException.class);
+
+        verifyNoInteractions(postRepository);
     }
 
     @Test

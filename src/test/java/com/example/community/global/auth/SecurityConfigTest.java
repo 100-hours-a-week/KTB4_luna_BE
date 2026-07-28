@@ -3,6 +3,7 @@ package com.example.community.global.auth;
 import com.example.community.global.config.SecurityConfig;
 import com.example.community.global.controller.AdminController;
 import com.example.community.post.controller.PostController;
+import com.example.community.post.dto.PostPageResponseDTO;
 import com.example.community.post.service.PostService;
 import com.example.community.user.controller.UserController;
 import com.example.community.user.dto.LoginResponseDTO;
@@ -83,7 +84,7 @@ public class SecurityConfigTest {
     @Test
     @DisplayName("인증된 사용자는 그 외 엔드포인트에도 요청이 가능하다.")
     void otherRequest_canBeAccessedWithAuthentication() throws Exception{
-        when(postService.getPostList()).thenReturn(List.of());
+        when(postService.getPostList(0)).thenReturn(new PostPageResponseDTO(List.of(), 0, 20, 0, 0));
 
         mockMvc.perform(get("/api/posts").with(user("test")).header("Authorization", "Bearer access-token")).andExpect(status().isOk());
     }

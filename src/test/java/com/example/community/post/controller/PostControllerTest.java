@@ -55,6 +55,7 @@ class PostControllerTest {
     PostResponseDTO postResponseDTO;
     PostDetailResponseDTO postDetailResponseDTO;
     PostListResponseDTO postListResponseDTO;
+    PostPageResponseDTO postPageResponseDTO;
 
     @BeforeEach
     void setUp() {
@@ -84,6 +85,7 @@ class PostControllerTest {
                 new MetaDTO(0, 0, 0, false)
         );
         postListResponseDTO = new PostListResponseDTO(authorDTO, new PostItemDTO(post));
+        postPageResponseDTO = new PostPageResponseDTO(List.of(postListResponseDTO), 0, 20, 1, 1);
     }
 
     @Test
@@ -160,10 +162,50 @@ class PostControllerTest {
     @Test
     @DisplayName("게시글 목록 조회 성공 시 200")
     void getPostList_success_returns200() throws Exception{
+        when(postService.getPostList(0)).thenReturn(postPageResponseDTO);
+
         mockMvc.perform(get("/api/posts")
                         .with(authentication(userAuthentication)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("posts_loading_success"));
+                .andExpect(jsonPath("$.message").value("posts_loading_success"))
+                .andExpect(jsonPath("$.data.posts[0].post.postId").value(1L))
+                .andExpect(jsonPath("$.data.page").value(0))
+                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.totalElements").value(1))
+                .andExpect(jsonPath("$.data.totalPages").value(1));
+
+        verify(postService).getPostList(0);
+    }
+
+    @Test
+    @DisplayName("게시글 목록의 page 요청값을 service에 전달한다")
+    void getPostList_pageParameter_callsService() throws Exception {
+        PostPageResponseDTO secondPage = new PostPageResponseDTO(List.of(), 1, 20, 21, 2);
+        when(postService.getPostList(1)).thenReturn(secondPage);
+
+        mockMvc.perform(get("/api/posts")
+                        .param("page", "1")
+                        .with(authentication(userAuthentication)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.posts").isEmpty())
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.totalElements").value(21))
+                .andExpect(jsonPath("$.data.totalPages").value(2));
+
+        verify(postService).getPostList(1);
+    }
+
+    @Test
+    @DisplayName("게시글 목록의 page가 음수이면 400")
+    void getPostList_negativePage_returns400() throws Exception {
+        mockMvc.perform(get("/api/posts")
+                        .param("page", "-1")
+                        .with(authentication(userAuthentication)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("invalid_input"));
+
+        verifyNoInteractions(postService);
     }
     @Test
     @DisplayName("게시글 상세 조회 성공 시 200")

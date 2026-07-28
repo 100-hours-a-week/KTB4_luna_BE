@@ -16,6 +16,7 @@ import com.example.community.user.repository.UserCredentialRepository;
 import com.example.community.user.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,8 +26,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -68,6 +72,23 @@ class PostIntegrationTest {
 
     @BeforeEach
     void setUp() {
+        clearDatabase();
+
+        user = userRepository.save(new User("user", "", UserRole.ROLE_USER, UserStatus.ACTIVE));
+        otherUser = userRepository.save(new User("other", "", UserRole.ROLE_USER, UserStatus.ACTIVE));
+        admin = userRepository.save(new User("admin", "", UserRole.ROLE_ADMIN, UserStatus.ACTIVE));
+
+        userCredentialRepository.save(new UserCredential(user, "user@test.com", passwordEncoder.encode("Test1234!")));
+        userCredentialRepository.save(new UserCredential(otherUser, "other@test.com", passwordEncoder.encode("Test1234!")));
+        userCredentialRepository.save(new UserCredential(admin, "admin@test.com", passwordEncoder.encode("Test1234!")));
+    }
+
+    @AfterEach
+    void tearDown() {
+        clearDatabase();
+    }
+
+    private void clearDatabase() {
         commentRepository.deleteAll();
         postLikeRepository.deleteAll();
         reportRepository.deleteAll();
@@ -79,14 +100,6 @@ class PostIntegrationTest {
 
         userCredentialRepository.deleteAll();
         userRepository.deleteAll();
-
-        user = userRepository.save(new User("user", "", UserRole.ROLE_USER, UserStatus.ACTIVE));
-        otherUser = userRepository.save(new User("other", "", UserRole.ROLE_USER, UserStatus.ACTIVE));
-        admin = userRepository.save(new User("admin", "", UserRole.ROLE_ADMIN, UserStatus.ACTIVE));
-
-        userCredentialRepository.save(new UserCredential(user, "user@test.com", passwordEncoder.encode("Test1234!")));
-        userCredentialRepository.save(new UserCredential(otherUser, "other@test.com", passwordEncoder.encode("Test1234!")));
-        userCredentialRepository.save(new UserCredential(admin, "admin@test.com", passwordEncoder.encode("Test1234!")));
     }
 
     @Test
@@ -119,18 +132,77 @@ class PostIntegrationTest {
     }
 
     @Test
-    @DisplayName("JWT 인증 후 게시글 목록을 조회할 수 있다")
-    void getPostList_success() throws Exception {
-        Post post = savePost(user, "test title", "test body", "");
+    @DisplayName("게시글 목록을 20개씩 안정적으로 페이지 조회한다")
+    void getPostList_returnsStablePagesAndMetadata() throws Exception {
+        LocalDateTime sameCreatedAt = LocalDateTime.of(2026, 7, 24, 12, 0);
+        List<Post> activePosts = new ArrayList<>();
+        for (int index = 0; index < 45; index++) {
+            Post post = new Post(user, "title " + index, "body", "");
+            ReflectionTestUtils.setField(post, "createdAt", sameCreatedAt);
+            if (index == 44) {
+                post.blindPost();
+            }
+            activePosts.add(postRepository.save(post));
+        }
+
+        Post deletedPost = new Post(user, "deleted title", "body", "");
+        ReflectionTestUtils.setField(deletedPost, "createdAt", sameCreatedAt);
+        deletedPost.deletePost();
+        postRepository.save(deletedPost);
+
         String accessToken = loginAndGetAccessToken("user@test.com");
 
         mockMvc.perform(get("/api/posts")
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("posts_loading_success"))
-                .andExpect(jsonPath("$.data[0].author.nickname").value("user"))
-                .andExpect(jsonPath("$.data[0].post.postId").value(post.getPostId()))
-                .andExpect(jsonPath("$.data[0].post.title").value("test title"));
+                .andExpect(jsonPath("$.data.posts.length()").value(20))
+                .andExpect(jsonPath("$.data.posts[0].author.nickname").value("user"))
+                .andExpect(jsonPath("$.data.posts[0].post.postId").value(activePosts.get(44).getPostId()))
+                .andExpect(jsonPath("$.data.posts[0].post.title").value("숨김 처리된 게시글"))
+                .andExpect(jsonPath("$.data.posts[19].post.postId").value(activePosts.get(25).getPostId()))
+                .andExpect(jsonPath("$.data.page").value(0))
+                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.totalElements").value(45))
+                .andExpect(jsonPath("$.data.totalPages").value(3));
+
+        mockMvc.perform(get("/api/posts")
+                        .param("page", "1")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.posts.length()").value(20))
+                .andExpect(jsonPath("$.data.posts[0].post.postId").value(activePosts.get(24).getPostId()))
+                .andExpect(jsonPath("$.data.posts[19].post.postId").value(activePosts.get(5).getPostId()))
+                .andExpect(jsonPath("$.data.page").value(1))
+                .andExpect(jsonPath("$.data.totalElements").value(45))
+                .andExpect(jsonPath("$.data.totalPages").value(3));
+
+        mockMvc.perform(get("/api/posts")
+                        .param("page", "2")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.posts.length()").value(5))
+                .andExpect(jsonPath("$.data.posts[0].post.postId").value(activePosts.get(4).getPostId()))
+                .andExpect(jsonPath("$.data.posts[4].post.postId").value(activePosts.get(0).getPostId()))
+                .andExpect(jsonPath("$.data.page").value(2))
+                .andExpect(jsonPath("$.data.totalElements").value(45))
+                .andExpect(jsonPath("$.data.totalPages").value(3));
+
+        mockMvc.perform(get("/api/posts")
+                        .param("page", "3")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.posts").isEmpty())
+                .andExpect(jsonPath("$.data.page").value(3))
+                .andExpect(jsonPath("$.data.size").value(20))
+                .andExpect(jsonPath("$.data.totalElements").value(45))
+                .andExpect(jsonPath("$.data.totalPages").value(3));
+
+        mockMvc.perform(get("/api/posts")
+                        .param("page", "-1")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("invalid_input"));
     }
 
     @Test
