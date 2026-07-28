@@ -45,4 +45,4 @@ database.trace.db
 /application-local.properties
 
 ### Generated datasets ###
-/tools/dataset/output/
+/tools
