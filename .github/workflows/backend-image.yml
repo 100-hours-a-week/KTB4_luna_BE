@@ -64,4 +64,5 @@ jobs:
         run: docker push "${{ steps.image.outputs.uri }}"
 
       - name: Write job summary
-        run: echo 'ECR image tag: `${{ github.sha }}`' >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo 'ECR image tag: `${{ github.sha }}`' >> "$GITHUB_STEP_SUMMARY"
