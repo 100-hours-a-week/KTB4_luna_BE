@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,6 +22,10 @@ public class RealtimeConnectionRegistry {
 
     public Optional<RealtimeConnection> findById(String connectionId){
         return Optional.ofNullable(connections.get(connectionId));
+    }
+
+    public List<RealtimeConnection> findAll(){
+        return List.copyOf(connections.values());
     }
 
     public void remove(String connectionId, SseEmitter sseEmitter){

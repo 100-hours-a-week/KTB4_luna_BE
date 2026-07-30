@@ -23,6 +23,7 @@ class RealtimeConnectionRegistryTest {
         assertThat(second.getConnectionId()).isNotEqualTo(first.getConnectionId());
         assertThat(registry.findById(first.getConnectionId())).contains(first);
         assertThat(registry.findById(second.getConnectionId())).contains(second);
+        assertThat(registry.findAll()).containsExactlyInAnyOrder(first, second);
     }
 
     @Test
