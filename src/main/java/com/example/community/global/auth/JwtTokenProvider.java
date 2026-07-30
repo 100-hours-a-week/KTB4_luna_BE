@@ -2,6 +2,7 @@ package com.example.community.global.auth;
 
 import com.example.community.user.entity.User;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -90,5 +91,16 @@ public class JwtTokenProvider {
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+    public long getRemainingValidityMillis(String token){
+        try {
+            long remainingMillis =
+                    parseClaims(token).getExpiration().getTime()
+                            - System.currentTimeMillis();
+
+            return Math.max(remainingMillis, 0L);
+        } catch (ExpiredJwtException exception) {
+            return 0L;
+        }
     }
 }
