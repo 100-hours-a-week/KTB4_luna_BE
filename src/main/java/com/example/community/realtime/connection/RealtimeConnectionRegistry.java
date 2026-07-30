@@ -3,7 +3,6 @@ package com.example.community.realtime.connection;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,9 +12,9 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RealtimeConnectionRegistry {
     private final ConcurrentHashMap<String, RealtimeConnection> connections = new ConcurrentHashMap<>();
 
-    public RealtimeConnection register(long userId, SseEmitter sseEmitter, Instant connectedAt){
+    public RealtimeConnection register(long userId, SseEmitter sseEmitter){
         String connectionId = UUID.randomUUID().toString();
-        RealtimeConnection connection = new RealtimeConnection(connectionId, userId, sseEmitter, connectedAt);
+        RealtimeConnection connection = new RealtimeConnection(connectionId, userId, sseEmitter);
         connections.put(connectionId, connection);
         return connection;
     }

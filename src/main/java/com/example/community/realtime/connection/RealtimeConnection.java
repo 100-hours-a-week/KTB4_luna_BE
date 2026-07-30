@@ -3,24 +3,21 @@ package com.example.community.realtime.connection;
 import lombok.Getter;
 
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import java.time.Instant;
 
 @Getter
 public class RealtimeConnection {
     private final String connectionId;
     private final long userId;
     private final SseEmitter emitter;
-    private final Instant connectedAt;
 
     private RealtimeInterestType interestType;
     private Long postId;
     private long interestRevision;
 
-    public RealtimeConnection(String connectionId, long userId, SseEmitter sseEmitter, Instant connectedAt){
+    public RealtimeConnection(String connectionId, long userId, SseEmitter sseEmitter){
         this.connectionId = connectionId;
         this.userId = userId;
         this.emitter = sseEmitter;
-        this.connectedAt = connectedAt;
         interestType = RealtimeInterestType.NONE;
         postId = null;
         interestRevision = 0;
