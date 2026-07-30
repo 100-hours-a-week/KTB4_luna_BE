@@ -1,6 +1,7 @@
 package com.example.community.realtime.service;
 
 import com.example.community.CommunityApplication;
+import com.example.community.global.auth.AuthValidator;
 import com.example.community.global.exceptions.ContentNotFoundException;
 import com.example.community.global.exceptions.ForbiddenException;
 import com.example.community.global.exceptions.InvalidInputException;
@@ -16,7 +17,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,18 +38,18 @@ class RealtimeStreamServiceTest {
 
     RealtimeConnectionRegistry registry;
     SseEmitter emitter;
-    Instant connectedAt;
     RealtimeConnection connection;
     RealtimeStreamService service;
+    AuthValidator authValidator;
 
     @BeforeEach
     void setUp() {
         registry = mock(RealtimeConnectionRegistry.class);
         emitter = mock(SseEmitter.class);
-        connectedAt = Instant.parse("2026-07-30T10:00:00Z");
-        connection = new RealtimeConnection("connection-1", 1L, emitter, connectedAt);
-        when(registry.register(eq(1L), same(emitter), any(Instant.class))).thenReturn(connection);
-        service = new RealtimeStreamService(registry);
+        authValidator = mock(AuthValidator.class);
+        connection = new RealtimeConnection("connection-1", 1L, emitter);
+        when(registry.register(eq(1L), same(emitter))).thenReturn(connection);
+        service = new RealtimeStreamService(registry, authValidator);
     }
 
     @Test
@@ -58,7 +58,7 @@ class RealtimeStreamServiceTest {
         SseEmitter result = service.connect(1L, emitter);
 
         assertThat(result).isSameAs(emitter);
-        verify(registry).register(eq(1L), same(emitter), any(Instant.class));
+        verify(registry).register(eq(1L), same(emitter));
 
         ArgumentCaptor<SseEmitter.SseEventBuilder> eventCaptor =
                 ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
@@ -71,10 +71,7 @@ class RealtimeStreamServiceTest {
                 .filter(String.class::isInstance)
                 .map(String.class::cast)
                 .anyMatch(part -> part.contains("event:connected"))).isTrue();
-        assertThat(eventParts).contains(Map.of(
-                "connectionId", "connection-1",
-                "connectedAt", connectedAt
-        ));
+        assertThat(eventParts).contains(Map.of("connectionId", "connection-1"));
     }
 
     @Test
@@ -131,11 +128,11 @@ class RealtimeStreamServiceTest {
         SseEmitter runtimeFailedEmitter = mock(SseEmitter.class);
         SseEmitter activeEmitter = mock(SseEmitter.class);
         RealtimeConnection ioFailedConnection =
-                new RealtimeConnection("io-failed", 1L, ioFailedEmitter, connectedAt);
+                new RealtimeConnection("io-failed", 1L, ioFailedEmitter);
         RealtimeConnection runtimeFailedConnection =
-                new RealtimeConnection("runtime-failed", 2L, runtimeFailedEmitter, connectedAt);
+                new RealtimeConnection("runtime-failed", 2L, runtimeFailedEmitter);
         RealtimeConnection activeConnection =
-                new RealtimeConnection("active-connection", 3L, activeEmitter, connectedAt);
+                new RealtimeConnection("active-connection", 3L, activeEmitter);
         when(registry.findAll()).thenReturn(List.of(
                 ioFailedConnection,
                 runtimeFailedConnection,
@@ -265,6 +262,9 @@ class RealtimeStreamServiceTest {
     @DisplayName("다른 사용자의 연결은 변경할 수 없다")
     void cannotUpdateAnotherUsersConnection() {
         when(registry.findById("connection-1")).thenReturn(Optional.of(connection));
+        doThrow(new ForbiddenException())
+                .when(authValidator)
+                .validateOwner(2L, 1L);
 
         assertThatThrownBy(() -> service.updateInterest(
                 2L,

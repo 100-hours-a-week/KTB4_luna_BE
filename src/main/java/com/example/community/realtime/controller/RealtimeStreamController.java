@@ -1,16 +1,17 @@
 package com.example.community.realtime.controller;
 
+import com.example.community.global.ApiResponse;
 import com.example.community.global.auth.JwtTokenProvider;
+import com.example.community.realtime.dto.RealtimeInterestRequestDTO;
 import com.example.community.realtime.service.RealtimeStreamService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -36,6 +37,19 @@ public class RealtimeStreamController {
         long timeoutMillis = getTimeoutMillis(authorization);
         SseEmitter sseEmitter = new SseEmitter(timeoutMillis);
         return streamService.connect(userId, sseEmitter);
+    }
+
+    @PatchMapping("/connections/{connectionId}/interest")
+    public ResponseEntity<ApiResponse<Boolean>> updateInterest(Authentication authentication, @PathVariable String connectionId, @Valid @RequestBody RealtimeInterestRequestDTO request) {
+        long userId = getLoginUserId(authentication);
+        boolean updated = streamService.updateInterest(
+                userId,
+                connectionId,
+                request.getType(),
+                request.getPostId(),
+                request.getRevision()
+        );
+        return ResponseEntity.ok(new ApiResponse<>("realtime_interest_update_success", updated));
     }
 
     private long getLoginUserId(Authentication authentication){

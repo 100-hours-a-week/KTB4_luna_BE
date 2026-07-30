@@ -3,6 +3,9 @@ package com.example.community.realtime.controller;
 import com.example.community.global.auth.JwtTokenProvider;
 import com.example.community.global.config.SecurityConfig;
 import com.example.community.global.config.filter.JwtFilter;
+import com.example.community.global.exceptions.ContentNotFoundException;
+import com.example.community.global.exceptions.ForbiddenException;
+import com.example.community.realtime.connection.RealtimeInterestType;
 import com.example.community.realtime.service.RealtimeStreamService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +34,9 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -136,6 +141,130 @@ class RealtimeStreamControllerTest {
                         .accept(MediaType.TEXT_EVENT_STREAM))
                 .andExpect(status().isUnauthorized())
                 .andExpect(request().asyncNotStarted());
+
+        verifyNoInteractions(realtimeStreamService);
+    }
+
+    @Test
+    @DisplayName("인증 사용자는 연결의 관심 상태를 변경한다")
+    void updatesInterestForAuthenticatedUser() throws Exception {
+        when(realtimeStreamService.updateInterest(
+                1L,
+                "connection-1",
+                RealtimeInterestType.POST_DETAIL,
+                10L,
+                1L
+        )).thenReturn(true);
+
+        mockMvc.perform(patch("/api/realtime/connections/connection-1/interest")
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "type": "POST_DETAIL",
+                                    "postId": 10,
+                                    "revision": 1
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("realtime_interest_update_success"))
+                .andExpect(jsonPath("$.data").value(true));
+
+        verify(realtimeStreamService).updateInterest(
+                1L,
+                "connection-1",
+                RealtimeInterestType.POST_DETAIL,
+                10L,
+                1L
+        );
+    }
+
+    @Test
+    @DisplayName("관심 상태 type과 revision은 필수다")
+    void requiresInterestTypeAndRevision() throws Exception {
+        mockMvc.perform(patch("/api/realtime/connections/connection-1/interest")
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "postId": 10,
+                                    "revision": 1
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(patch("/api/realtime/connections/connection-1/interest")
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "type": "POST_DETAIL",
+                                    "postId": 10
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(realtimeStreamService);
+    }
+
+    @Test
+    @DisplayName("없는 연결의 관심 상태 변경은 404다")
+    void returnsNotFoundForMissingConnection() throws Exception {
+        when(realtimeStreamService.updateInterest(
+                1L,
+                "missing",
+                RealtimeInterestType.POST_LIST,
+                null,
+                1L
+        )).thenThrow(new ContentNotFoundException());
+
+        mockMvc.perform(patch("/api/realtime/connections/missing/interest")
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "type": "POST_LIST",
+                                    "revision": 1
+                                }
+                                """))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 연결 관심 상태 변경은 403이다")
+    void returnsForbiddenForAnotherUsersConnection() throws Exception {
+        when(realtimeStreamService.updateInterest(
+                1L,
+                "connection-2",
+                RealtimeInterestType.POST_LIST,
+                null,
+                1L
+        )).thenThrow(new ForbiddenException());
+
+        mockMvc.perform(patch("/api/realtime/connections/connection-2/interest")
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "type": "POST_LIST",
+                                    "revision": 1
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("인증되지 않은 사용자는 연결 관심 상태를 변경할 수 없다")
+    void rejectsUnauthenticatedInterestUpdate() throws Exception {
+        mockMvc.perform(patch("/api/realtime/connections/connection-1/interest")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "type": "POST_LIST",
+                                    "revision": 1
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
 
         verifyNoInteractions(realtimeStreamService);
     }

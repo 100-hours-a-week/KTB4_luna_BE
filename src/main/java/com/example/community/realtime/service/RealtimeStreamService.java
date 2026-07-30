@@ -1,27 +1,31 @@
 package com.example.community.realtime.service;
 
+import com.example.community.global.auth.AuthValidator;
+import com.example.community.global.exceptions.ContentNotFoundException;
+import com.example.community.global.exceptions.InvalidInputException;
 import com.example.community.realtime.connection.RealtimeConnection;
 import com.example.community.realtime.connection.RealtimeConnectionRegistry;
+import com.example.community.realtime.connection.RealtimeInterestType;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
 @Service
 public class RealtimeStreamService {
     private final RealtimeConnectionRegistry registry;
+    private final AuthValidator authValidator;
 
-    public RealtimeStreamService(RealtimeConnectionRegistry registry){
+    public RealtimeStreamService(RealtimeConnectionRegistry registry, AuthValidator authValidator){
         this.registry = registry;
+        this.authValidator = authValidator;
     }
 
     public SseEmitter connect(long userId, SseEmitter sseEmitter) throws IOException{
-        Instant connectedAt = Instant.now();
-        RealtimeConnection connection = registry.register(userId, sseEmitter, connectedAt);
+        RealtimeConnection connection = registry.register(userId, sseEmitter);
         String connectionId = connection.getConnectionId();
         try {
             sseEmitter.onCompletion(() -> registry.remove(connectionId, sseEmitter));
@@ -29,16 +33,28 @@ public class RealtimeStreamService {
             sseEmitter.onError(error -> registry.remove(connectionId, sseEmitter));
             sseEmitter.send(SseEmitter.event()
                     .name("connected")
-                    .data(Map.of(
-                            "connectionId", connectionId,
-                            "connectedAt", connection.getConnectedAt()
-                    )));
+                    .data(Map.of("connectionId", connectionId)));
             return sseEmitter;
         } catch(IOException | RuntimeException exception){
             registry.remove(connectionId, sseEmitter);
             throw exception;
         }
     }
+
+    public boolean updateInterest(long userId, String connectionId, RealtimeInterestType interestType, Long postId, long interestRevision){
+        RealtimeConnection connection = registry.findById(connectionId).orElseThrow(ContentNotFoundException::new);
+        authValidator.validateOwner(userId, connection.getUserId());
+        if(interestType == RealtimeInterestType.POST_DETAIL && (postId == null || postId <= 0)) {
+            throw new InvalidInputException();
+        }
+
+        return connection.updateInterestIfNewer(
+                interestType,
+                interestType == RealtimeInterestType.POST_DETAIL ? postId : null,
+                interestRevision
+        );
+    }
+
     @Scheduled(fixedDelay=25_000)
     public void sendHeartbeat() {
         List<RealtimeConnection> connections = registry.findAll();
