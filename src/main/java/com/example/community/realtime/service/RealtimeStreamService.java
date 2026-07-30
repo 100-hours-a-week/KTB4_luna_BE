@@ -2,11 +2,13 @@ package com.example.community.realtime.service;
 
 import com.example.community.realtime.connection.RealtimeConnection;
 import com.example.community.realtime.connection.RealtimeConnectionRegistry;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -37,4 +39,19 @@ public class RealtimeStreamService {
             throw exception;
         }
     }
+    @Scheduled(fixedDelay=25_000)
+    public void sendHeartbeat() {
+        List<RealtimeConnection> connections = registry.findAll();
+        for(RealtimeConnection connection : connections){
+            sendEventToClient(connection.getConnectionId(), connection.getEmitter(), SseEmitter.event().comment("heartbeat"));
+        }
+    }
+    private void sendEventToClient(String connectionId, SseEmitter sseEmitter, SseEmitter.SseEventBuilder event){
+        try{
+            sseEmitter.send(event);
+        } catch(IOException | RuntimeException exception){
+            registry.remove(connectionId, sseEmitter);
+        }
+    }
+
 }
