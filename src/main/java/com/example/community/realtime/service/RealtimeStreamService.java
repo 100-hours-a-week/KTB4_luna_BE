@@ -10,6 +10,8 @@ import com.example.community.realtime.event.CommentCreatedEvent;
 import com.example.community.realtime.event.PostCreatedEvent;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -57,6 +59,7 @@ public class RealtimeStreamService {
         );
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void sendPostCreated(PostCreatedEvent event){
         for(RealtimeConnection connection : registry.findAll()){
             if(connection.getUserId() == event.actorUserId() || connection.getInterestType() != RealtimeInterestType.POST_LIST) continue;
@@ -68,6 +71,7 @@ public class RealtimeStreamService {
         }
     }
 
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void sendCommentCreated(CommentCreatedEvent event){
         for(RealtimeConnection connection : registry.findAll()){
             if(connection.getUserId() == event.actorUserId()
