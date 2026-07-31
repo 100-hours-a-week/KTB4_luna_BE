@@ -17,7 +17,6 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.time.Instant;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -82,8 +81,7 @@ class RealtimeEventTransactionTest {
         return new PostCreatedEvent(
                 "post-event-1",
                 10L,
-                1L,
-                Instant.parse("2026-07-31T10:00:00Z")
+                1L
         );
     }
 
@@ -92,9 +90,7 @@ class RealtimeEventTransactionTest {
                 "comment-event-1",
                 10L,
                 20L,
-                5L,
-                1L,
-                Instant.parse("2026-07-31T10:01:00Z")
+                1L
         );
     }
 }

@@ -10,7 +10,6 @@ import com.example.community.post.repository.PostRepository;
 import com.example.community.realtime.connection.RealtimeConnection;
 import com.example.community.realtime.connection.RealtimeConnectionRegistry;
 import com.example.community.realtime.connection.RealtimeInterestType;
-import com.example.community.realtime.event.CommentCreatedEvent;
 import com.example.community.realtime.service.RealtimeStreamService;
 import com.example.community.user.entity.User;
 import com.example.community.user.entity.UserRole;
@@ -28,6 +27,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -103,7 +103,7 @@ class RealtimeCommentEventIntegrationTest {
     }
 
     @Test
-    @DisplayName("실제 댓글·대댓글 생성 commit 후 comment-created와 parentCommentId를 전달한다")
+    @DisplayName("실제 댓글·대댓글 생성 commit 후 최소 식별자를 전달한다")
     void uploadCommentPublishesCommentCreatedAfterCommit() throws Exception {
         realtimeStreamService.connect(recipient.getUserId(), recipientEmitter);
         RealtimeConnection connection = registry.findAll().stream()
@@ -129,10 +129,12 @@ class RealtimeCommentEventIntegrationTest {
         ArgumentCaptor<SseEmitter.SseEventBuilder> parentEventCaptor =
                 ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
         verify(recipientEmitter).send(parentEventCaptor.capture());
-        CommentCreatedEvent parentEvent = eventFrom(parentEventCaptor.getValue());
-        assertThat(parentEvent.postId()).isEqualTo(post.getPostId());
-        assertThat(parentEvent.commentId()).isEqualTo(parentResponse.getComment().getCommentId());
-        assertThat(parentEvent.parentCommentId()).isNull();
+        Map<?, ?> parentEvent = eventFrom(parentEventCaptor.getValue());
+        assertThat(parentEvent.get("postId")).isEqualTo(post.getPostId());
+        assertThat(parentEvent.get("commentId")).isEqualTo(parentResponse.getComment().getCommentId());
+        assertThat(parentEvent.containsKey("actorUserId")).isFalse();
+        assertThat(parentEvent.containsKey("parentCommentId")).isFalse();
+        assertThat(parentEvent.containsKey("comment")).isFalse();
 
         clearInvocations(recipientEmitter);
         CommentRequestDTO replyRequest = commentRequest(
@@ -149,17 +151,19 @@ class RealtimeCommentEventIntegrationTest {
         ArgumentCaptor<SseEmitter.SseEventBuilder> replyEventCaptor =
                 ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
         verify(recipientEmitter).send(replyEventCaptor.capture());
-        CommentCreatedEvent replyEvent = eventFrom(replyEventCaptor.getValue());
-        assertThat(replyEvent.postId()).isEqualTo(post.getPostId());
-        assertThat(replyEvent.commentId()).isEqualTo(replyResponse.getComment().getCommentId());
-        assertThat(replyEvent.parentCommentId()).isEqualTo(parentResponse.getComment().getCommentId());
+        Map<?, ?> replyEvent = eventFrom(replyEventCaptor.getValue());
+        assertThat(replyEvent.get("postId")).isEqualTo(post.getPostId());
+        assertThat(replyEvent.get("commentId")).isEqualTo(replyResponse.getComment().getCommentId());
+        assertThat(replyEvent.containsKey("actorUserId")).isFalse();
+        assertThat(replyEvent.containsKey("parentCommentId")).isFalse();
+        assertThat(replyEvent.containsKey("comment")).isFalse();
     }
 
-    private CommentCreatedEvent eventFrom(SseEmitter.SseEventBuilder eventBuilder) {
+    private Map<?, ?> eventFrom(SseEmitter.SseEventBuilder eventBuilder) {
         return eventBuilder.build().stream()
                 .map(SseEmitter.DataWithMediaType::getData)
-                .filter(CommentCreatedEvent.class::isInstance)
-                .map(CommentCreatedEvent.class::cast)
+                .filter(Map.class::isInstance)
+                .map(Map.class::cast)
                 .findFirst()
                 .orElseThrow();
     }

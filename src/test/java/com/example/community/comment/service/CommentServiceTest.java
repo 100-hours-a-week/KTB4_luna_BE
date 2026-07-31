@@ -103,10 +103,8 @@ public class CommentServiceTest {
         verify(eventPublisher).publishEvent(eventCaptor.capture());
         assertThat(eventCaptor.getValue().postId()).isEqualTo(post.getPostId());
         assertThat(eventCaptor.getValue().commentId()).isEqualTo(comment.getCommentId());
-        assertThat(eventCaptor.getValue().parentCommentId()).isNull();
         assertThat(eventCaptor.getValue().actorUserId()).isEqualTo(commenter.getUserId());
         assertThat(eventCaptor.getValue().eventId()).isNotBlank();
-        assertThat(eventCaptor.getValue().occurredAt()).isNotNull();
     }
 
     @Test
@@ -128,7 +126,6 @@ public class CommentServiceTest {
         verify(eventPublisher).publishEvent(eventCaptor.capture());
         assertThat(eventCaptor.getValue().postId()).isEqualTo(post.getPostId());
         assertThat(eventCaptor.getValue().commentId()).isEqualTo(reply.getCommentId());
-        assertThat(eventCaptor.getValue().parentCommentId()).isEqualTo(parent.getCommentId());
         assertThat(eventCaptor.getValue().actorUserId()).isEqualTo(commenter.getUserId());
     }
 

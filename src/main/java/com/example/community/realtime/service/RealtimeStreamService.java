@@ -66,7 +66,7 @@ public class RealtimeStreamService {
             SseEmitter.SseEventBuilder sseEvent = SseEmitter.event()
                     .id(event.eventId())
                     .name("post-created")
-                    .data(event);
+                    .data(Map.of("postId", event.postId()));
             sendEventToClient(connection.getConnectionId(), connection.getEmitter(), sseEvent);
         }
     }
@@ -81,7 +81,10 @@ public class RealtimeStreamService {
             SseEmitter.SseEventBuilder sseEvent = SseEmitter.event()
                     .id(event.eventId())
                     .name("comment-created")
-                    .data(event);
+                    .data(Map.of(
+                            "postId", event.postId(),
+                            "commentId", event.commentId()
+                    ));
             sendEventToClient(connection.getConnectionId(), connection.getEmitter(), sseEvent);
         }
     }

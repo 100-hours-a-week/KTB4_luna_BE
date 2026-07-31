@@ -25,7 +25,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -72,8 +71,7 @@ public class PostService {
         eventPublisher.publishEvent(new PostCreatedEvent(
                 UUID.randomUUID().toString(),
                 post.getPostId(),
-                author.getUserId(),
-                Instant.now()
+                author.getUserId()
         ));
 
         return new PostResponseDTO(authorMapper.toAuthorDTO(author), new PostDTO(post));

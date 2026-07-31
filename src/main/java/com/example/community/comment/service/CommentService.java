@@ -25,7 +25,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -70,9 +69,7 @@ public class CommentService {
                 UUID.randomUUID().toString(),
                 post.getPostId(),
                 comment.getCommentId(),
-                parentComment == null ? null : parentComment.getCommentId(),
-                author.getUserId(),
-                Instant.now()
+                author.getUserId()
         ));
         return new CommentResponseDTO(authorMapper.toAuthorDTO(author), toCommentDTO(comment));
     }

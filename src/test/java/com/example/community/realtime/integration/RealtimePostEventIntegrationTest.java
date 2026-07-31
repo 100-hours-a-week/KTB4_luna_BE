@@ -8,7 +8,6 @@ import com.example.community.post.service.PostService;
 import com.example.community.realtime.connection.RealtimeConnection;
 import com.example.community.realtime.connection.RealtimeConnectionRegistry;
 import com.example.community.realtime.connection.RealtimeInterestType;
-import com.example.community.realtime.event.PostCreatedEvent;
 import com.example.community.realtime.service.RealtimeStreamService;
 import com.example.community.user.entity.User;
 import com.example.community.user.entity.UserRole;
@@ -25,6 +24,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -119,11 +119,14 @@ class RealtimePostEventIntegrationTest {
                 .filter(String.class::isInstance)
                 .map(String.class::cast)
                 .anyMatch(part -> part.contains("event:post-created"))).isTrue();
-        assertThat(eventParts.stream()
-                .filter(PostCreatedEvent.class::isInstance)
-                .map(PostCreatedEvent.class::cast)
-                .map(PostCreatedEvent::postId)
-                .toList()).containsExactly(postId);
+        Map<?, ?> payload = eventParts.stream()
+                .filter(Map.class::isInstance)
+                .map(Map.class::cast)
+                .findFirst()
+                .orElseThrow();
+        assertThat(payload.get("postId")).isEqualTo(postId);
+        assertThat(payload.containsKey("actorUserId")).isFalse();
+        assertThat(payload.containsKey("post")).isFalse();
     }
 
     @Test
@@ -153,11 +156,14 @@ class RealtimePostEventIntegrationTest {
                 .filter(String.class::isInstance)
                 .map(String.class::cast)
                 .anyMatch(part -> part.contains("event:post-created"))).isTrue();
-        assertThat(eventParts.stream()
-                .filter(PostCreatedEvent.class::isInstance)
-                .map(PostCreatedEvent.class::cast)
-                .map(PostCreatedEvent::postId)
-                .toList()).containsExactly(postId);
+        Map<?, ?> payload = eventParts.stream()
+                .filter(Map.class::isInstance)
+                .map(Map.class::cast)
+                .findFirst()
+                .orElseThrow();
+        assertThat(payload.get("postId")).isEqualTo(postId);
+        assertThat(payload.containsKey("actorUserId")).isFalse();
+        assertThat(payload.containsKey("post")).isFalse();
     }
 
     private void connectRecipientToPostList() throws Exception {

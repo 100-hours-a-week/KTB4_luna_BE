@@ -21,7 +21,6 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -311,8 +310,7 @@ class RealtimeStreamServiceTest {
         PostCreatedEvent event = new PostCreatedEvent(
                 "post-event-1",
                 10L,
-                1L,
-                Instant.parse("2026-07-31T10:00:00Z")
+                1L
         );
 
         service.sendPostCreated(event);
@@ -331,7 +329,13 @@ class RealtimeStreamServiceTest {
                 .filter(String.class::isInstance)
                 .map(String.class::cast)
                 .anyMatch(part -> part.contains("event:post-created"))).isTrue();
-        assertThat(eventParts).contains(event);
+        assertThat(eventParts.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .anyMatch(part -> part.contains("id:post-event-1"))).isTrue();
+        assertThat(eventParts).contains(Map.of("postId", 10L));
+        assertThat(eventParts).noneMatch(part -> part instanceof Map<?, ?> map
+                && (map.containsKey("actorUserId") || map.containsKey("post")));
     }
 
     @Test
@@ -362,8 +366,7 @@ class RealtimeStreamServiceTest {
         service.sendPostCreated(new PostCreatedEvent(
                 "post-event-2",
                 10L,
-                1L,
-                Instant.parse("2026-07-31T10:02:00Z")
+                1L
         ));
 
         verify(registry).remove("failed", failedEmitter);
@@ -399,9 +402,7 @@ class RealtimeStreamServiceTest {
                 "comment-event-1",
                 10L,
                 20L,
-                5L,
-                1L,
-                Instant.parse("2026-07-31T10:01:00Z")
+                1L
         );
 
         service.sendCommentCreated(event);
@@ -420,7 +421,14 @@ class RealtimeStreamServiceTest {
                 .filter(String.class::isInstance)
                 .map(String.class::cast)
                 .anyMatch(part -> part.contains("event:comment-created"))).isTrue();
-        assertThat(eventParts).contains(event);
+        assertThat(eventParts.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .anyMatch(part -> part.contains("id:comment-event-1"))).isTrue();
+        assertThat(eventParts).contains(Map.of("postId", 10L, "commentId", 20L));
+        assertThat(eventParts).noneMatch(part -> part instanceof Map<?, ?> map
+                && (map.containsKey("actorUserId")
+                || map.containsKey("commentId") && map.containsKey("parentCommentId")));
     }
 
     @Test
@@ -441,9 +449,7 @@ class RealtimeStreamServiceTest {
                 "comment-event-2",
                 10L,
                 21L,
-                null,
-                1L,
-                Instant.parse("2026-07-31T10:03:00Z")
+                1L
         ));
 
         verify(registry).remove("failed", failedEmitter);
