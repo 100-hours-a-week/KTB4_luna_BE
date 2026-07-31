@@ -1,6 +1,8 @@
 package com.example.community.realtime.integration;
 
 import com.example.community.post.dto.PostRequestDTO;
+import com.example.community.post.draft.dto.PostDraftRequestDTO;
+import com.example.community.post.draft.service.PostDraftService;
 import com.example.community.post.repository.PostRepository;
 import com.example.community.post.service.PostService;
 import com.example.community.realtime.connection.RealtimeConnection;
@@ -36,6 +38,9 @@ class RealtimePostEventIntegrationTest {
 
     @Autowired
     PostService postService;
+
+    @Autowired
+    PostDraftService postDraftService;
 
     @Autowired
     RealtimeStreamService realtimeStreamService;
@@ -94,18 +99,7 @@ class RealtimePostEventIntegrationTest {
     @Test
     @DisplayName("실제 게시글 생성 commit 후 recipient의 POST_LIST 연결에 post-created를 전달한다")
     void uploadPublishesPostCreatedAfterCommit() throws Exception {
-        realtimeStreamService.connect(recipient.getUserId(), recipientEmitter);
-        RealtimeConnection connection = registry.findById(
-                registry.findAll().get(0).getConnectionId()
-        ).orElseThrow();
-        realtimeStreamService.updateInterest(
-                recipient.getUserId(),
-                connection.getConnectionId(),
-                RealtimeInterestType.POST_LIST,
-                null,
-                1L
-        );
-        clearInvocations(recipientEmitter);
+        connectRecipientToPostList();
 
         PostRequestDTO request = new PostRequestDTO();
         request.setTitle("realtime post");
@@ -130,5 +124,54 @@ class RealtimePostEventIntegrationTest {
                 .map(PostCreatedEvent.class::cast)
                 .map(PostCreatedEvent::postId)
                 .toList()).containsExactly(postId);
+    }
+
+    @Test
+    @DisplayName("실제 draft publish commit 후 recipient의 POST_LIST 연결에 post-created를 전달한다")
+    void publishDraftPublishesPostCreatedAfterCommit() throws Exception {
+        connectRecipientToPostList();
+
+        PostDraftRequestDTO request = new PostDraftRequestDTO();
+        request.setTitle("draft realtime");
+        request.setPostBody("draft body");
+        request.setPostImageUrl("");
+        request.setVersion(1);
+        postDraftService.saveDraft(actor.getUserId(), request);
+
+        long postId = postDraftService.publishDraft(actor.getUserId(), request)
+                .getPost()
+                .getPostId();
+        createdPostId = postId;
+
+        ArgumentCaptor<SseEmitter.SseEventBuilder> eventCaptor =
+                ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        verify(recipientEmitter).send(eventCaptor.capture());
+        List<Object> eventParts = eventCaptor.getValue().build().stream()
+                .map(SseEmitter.DataWithMediaType::getData)
+                .toList();
+        assertThat(eventParts.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .anyMatch(part -> part.contains("event:post-created"))).isTrue();
+        assertThat(eventParts.stream()
+                .filter(PostCreatedEvent.class::isInstance)
+                .map(PostCreatedEvent.class::cast)
+                .map(PostCreatedEvent::postId)
+                .toList()).containsExactly(postId);
+    }
+
+    private void connectRecipientToPostList() throws Exception {
+        realtimeStreamService.connect(recipient.getUserId(), recipientEmitter);
+        RealtimeConnection connection = registry.findAll().stream()
+                .findFirst()
+                .orElseThrow();
+        realtimeStreamService.updateInterest(
+                recipient.getUserId(),
+                connection.getConnectionId(),
+                RealtimeInterestType.POST_LIST,
+                null,
+                1L
+        );
+        clearInvocations(recipientEmitter);
     }
 }
