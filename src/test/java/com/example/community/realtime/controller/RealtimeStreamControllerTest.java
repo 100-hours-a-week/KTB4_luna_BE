@@ -208,6 +208,23 @@ class RealtimeStreamControllerTest {
     }
 
     @Test
+    @DisplayName("알 수 없는 관심 상태 type은 400으로 거부한다")
+    void rejectsUnknownInterestType() throws Exception {
+        mockMvc.perform(patch("/api/realtime/connections/connection-1/interest")
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "type": "UNKNOWN",
+                                    "revision": 1
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(realtimeStreamService);
+    }
+
+    @Test
     @DisplayName("없는 연결의 관심 상태 변경은 404다")
     void returnsNotFoundForMissingConnection() throws Exception {
         when(realtimeStreamService.updateInterest(
