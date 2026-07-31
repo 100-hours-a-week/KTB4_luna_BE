@@ -16,6 +16,7 @@ import com.example.community.post.dto.PostResponseDTO;
 import com.example.community.post.entity.Post;
 import com.example.community.post.factory.PostFactory;
 import com.example.community.post.repository.PostRepository;
+import com.example.community.realtime.event.PostCreatedEvent;
 import com.example.community.user.entity.User;
 import com.example.community.user.entity.UserRole;
 import com.example.community.user.entity.UserStatus;
@@ -24,11 +25,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
@@ -52,6 +55,8 @@ public class PostDraftServiceTest {
     PostFactory postFactory;
     @Mock
     AuthValidator authValidator;
+    @Mock
+    ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     PostDraftService postDraftService;
@@ -214,6 +219,12 @@ public class PostDraftServiceTest {
         InOrder inOrder = inOrder(postRepository, postDraftRepository);
         inOrder.verify(postRepository).save(post);
         inOrder.verify(postDraftRepository).delete(draft);
+        ArgumentCaptor<PostCreatedEvent> eventCaptor = ArgumentCaptor.forClass(PostCreatedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().postId()).isEqualTo(1L);
+        assertThat(eventCaptor.getValue().actorUserId()).isEqualTo(1L);
+        assertThat(eventCaptor.getValue().eventId()).isNotBlank();
+        assertThat(eventCaptor.getValue().occurredAt()).isNotNull();
     }
 
     @Test
@@ -227,6 +238,7 @@ public class PostDraftServiceTest {
         verify(postFactory, never()).create(any(), anyString(), anyString(), any());
         verify(postRepository, never()).save(any(Post.class));
         verify(postDraftRepository, never()).delete(any(PostDraft.class));
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test

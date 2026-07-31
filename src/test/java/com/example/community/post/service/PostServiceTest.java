@@ -13,6 +13,7 @@ import com.example.community.post.repository.PostLikeRepository;
 import com.example.community.post.repository.PostRepository;
 import com.example.community.post.repository.PostRevisionRepository;
 import com.example.community.post.repository.ReportRepository;
+import com.example.community.realtime.event.PostCreatedEvent;
 import com.example.community.user.entity.User;
 import com.example.community.user.entity.UserRole;
 import com.example.community.user.entity.UserStatus;
@@ -21,12 +22,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -64,6 +67,8 @@ class PostServiceTest {
     AuthorMapper authorMapper;
     @Mock
     AuthValidator authValidator;
+    @Mock
+    ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     PostService postService;
@@ -114,6 +119,12 @@ class PostServiceTest {
 
         verify(postFactory).create(user, postRequestDTO);
         verify(postRepository).save(post);
+        ArgumentCaptor<PostCreatedEvent> eventCaptor = ArgumentCaptor.forClass(PostCreatedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().postId()).isEqualTo(1L);
+        assertThat(eventCaptor.getValue().actorUserId()).isEqualTo(1L);
+        assertThat(eventCaptor.getValue().eventId()).isNotBlank();
+        assertThat(eventCaptor.getValue().occurredAt()).isNotNull();
     }
 
     @Test
@@ -124,6 +135,7 @@ class PostServiceTest {
         assertThatThrownBy(() -> postService.upload(1L, postRequest("title", "body", ""))).isInstanceOf(NotRegisteredException.class);
 
         verify(postRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test

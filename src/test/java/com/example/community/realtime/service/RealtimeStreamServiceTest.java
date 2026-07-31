@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -330,6 +332,17 @@ class RealtimeStreamServiceTest {
                 .map(String.class::cast)
                 .anyMatch(part -> part.contains("event:post-created"))).isTrue();
         assertThat(eventParts).contains(event);
+    }
+
+    @Test
+    @DisplayName("post-created 전송은 transaction commit 이후 listener로 실행된다")
+    void postCreatedUsesAfterCommitListener() throws Exception {
+        TransactionalEventListener listener = RealtimeStreamService.class
+                .getDeclaredMethod("sendPostCreated", PostCreatedEvent.class)
+                .getAnnotation(TransactionalEventListener.class);
+
+        assertThat(listener).isNotNull();
+        assertThat(listener.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
     }
 
     @Test
