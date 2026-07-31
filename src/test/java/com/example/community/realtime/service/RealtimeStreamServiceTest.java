@@ -346,6 +346,31 @@ class RealtimeStreamServiceTest {
     }
 
     @Test
+    @DisplayName("post-created 전송 중 한 연결이 실패해도 다른 연결에는 계속 전송한다")
+    void postCreatedFailureDoesNotBlockOtherConnections() throws Exception {
+        SseEmitter failedEmitter = mock(SseEmitter.class);
+        SseEmitter activeEmitter = mock(SseEmitter.class);
+        RealtimeConnection failedConnection = new RealtimeConnection("failed", 2L, failedEmitter);
+        RealtimeConnection activeConnection = new RealtimeConnection("active", 3L, activeEmitter);
+        failedConnection.updateInterestIfNewer(RealtimeInterestType.POST_LIST, null, 1L);
+        activeConnection.updateInterestIfNewer(RealtimeInterestType.POST_LIST, null, 1L);
+        when(registry.findAll()).thenReturn(List.of(failedConnection, activeConnection));
+        doThrow(new IOException("post event failed"))
+                .when(failedEmitter)
+                .send(any(SseEmitter.SseEventBuilder.class));
+
+        service.sendPostCreated(new PostCreatedEvent(
+                "post-event-2",
+                10L,
+                1L,
+                Instant.parse("2026-07-31T10:02:00Z")
+        ));
+
+        verify(registry).remove("failed", failedEmitter);
+        verify(activeEmitter).send(any(SseEmitter.SseEventBuilder.class));
+    }
+
+    @Test
     @DisplayName("comment-created는 작성자를 제외한 같은 게시글의 POST_DETAIL 연결에만 전송한다")
     void sendsCommentCreatedOnlyToMatchingPostDetailConnectionsExceptActor() throws Exception {
         SseEmitter matchingEmitter = mock(SseEmitter.class);
@@ -396,5 +421,32 @@ class RealtimeStreamServiceTest {
                 .map(String.class::cast)
                 .anyMatch(part -> part.contains("event:comment-created"))).isTrue();
         assertThat(eventParts).contains(event);
+    }
+
+    @Test
+    @DisplayName("comment-created 전송 중 한 연결이 실패해도 다른 연결에는 계속 전송한다")
+    void commentCreatedFailureDoesNotBlockOtherConnections() throws Exception {
+        SseEmitter failedEmitter = mock(SseEmitter.class);
+        SseEmitter activeEmitter = mock(SseEmitter.class);
+        RealtimeConnection failedConnection = new RealtimeConnection("failed", 2L, failedEmitter);
+        RealtimeConnection activeConnection = new RealtimeConnection("active", 3L, activeEmitter);
+        failedConnection.updateInterestIfNewer(RealtimeInterestType.POST_DETAIL, 10L, 1L);
+        activeConnection.updateInterestIfNewer(RealtimeInterestType.POST_DETAIL, 10L, 1L);
+        when(registry.findAll()).thenReturn(List.of(failedConnection, activeConnection));
+        doThrow(new IllegalStateException("comment event failed"))
+                .when(failedEmitter)
+                .send(any(SseEmitter.SseEventBuilder.class));
+
+        service.sendCommentCreated(new CommentCreatedEvent(
+                "comment-event-2",
+                10L,
+                21L,
+                null,
+                1L,
+                Instant.parse("2026-07-31T10:03:00Z")
+        ));
+
+        verify(registry).remove("failed", failedEmitter);
+        verify(activeEmitter).send(any(SseEmitter.SseEventBuilder.class));
     }
 }
