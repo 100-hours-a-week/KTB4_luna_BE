@@ -289,10 +289,10 @@ public class CommentServiceTest {
         List<CommentResponseDTO> response = commentService.getComments(post.getPostId());
 
         assertThat(response).hasSize(3);
-        assertThat(response.get(0).getAuthor().getNickname()).isEqualTo("commenter");
-        assertThat(response.get(0).getComment().getCommentId()).isEqualTo(comment.getCommentId());
-        assertThat(response.get(0).getComment().getParentCommentId()).isNull();
-        assertThat(response.get(0).getComment().getCommentBody()).isEqualTo("test comment");
+        assertThat(response.getFirst().getAuthor().getNickname()).isEqualTo("commenter");
+        assertThat(response.getFirst().getComment().getCommentId()).isEqualTo(comment.getCommentId());
+        assertThat(response.getFirst().getComment().getParentCommentId()).isNull();
+        assertThat(response.getFirst().getComment().getCommentBody()).isEqualTo("test comment");
         assertThat(response.get(0).getComment().isModified()).isFalse();
         assertThat(response.get(0).getComment().isDeleted()).isFalse();
         assertThat(response.get(1).getComment().getParentCommentId()).isEqualTo(comment.getCommentId());

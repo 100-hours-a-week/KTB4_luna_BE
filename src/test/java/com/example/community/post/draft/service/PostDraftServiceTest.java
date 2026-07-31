@@ -6,7 +6,6 @@ import com.example.community.global.exceptions.ConflictException;
 import com.example.community.global.exceptions.ContentNotFoundException;
 import com.example.community.global.exceptions.ForbiddenException;
 import com.example.community.global.exceptions.NotRegisteredException;
-import com.example.community.global.mapper.AuthorMapper;
 import com.example.community.post.draft.dto.PostDraftRequestDTO;
 import com.example.community.post.draft.dto.PostDraftResponseDTO;
 import com.example.community.post.draft.entity.PostDraft;
@@ -30,7 +29,6 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
