@@ -8,6 +8,8 @@ import com.example.community.global.exceptions.InvalidInputException;
 import com.example.community.realtime.connection.RealtimeConnection;
 import com.example.community.realtime.connection.RealtimeConnectionRegistry;
 import com.example.community.realtime.connection.RealtimeInterestType;
+import com.example.community.realtime.event.CommentCreatedEvent;
+import com.example.community.realtime.event.PostCreatedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -276,5 +279,109 @@ class RealtimeStreamServiceTest {
 
         assertThat(connection.getInterestType()).isEqualTo(RealtimeInterestType.NONE);
         assertThat(connection.getInterestRevision()).isZero();
+    }
+
+    @Test
+    @DisplayName("post-created는 작성자를 제외한 POST_LIST 관심 연결에만 전송한다")
+    void sendsPostCreatedOnlyToPostListConnectionsExceptActor() throws Exception {
+        SseEmitter firstListEmitter = mock(SseEmitter.class);
+        SseEmitter secondListEmitter = mock(SseEmitter.class);
+        SseEmitter detailEmitter = mock(SseEmitter.class);
+        SseEmitter actorEmitter = mock(SseEmitter.class);
+        RealtimeConnection firstListConnection =
+                new RealtimeConnection("list-1", 2L, firstListEmitter);
+        RealtimeConnection secondListConnection =
+                new RealtimeConnection("list-2", 2L, secondListEmitter);
+        RealtimeConnection detailConnection =
+                new RealtimeConnection("detail", 3L, detailEmitter);
+        RealtimeConnection actorConnection =
+                new RealtimeConnection("actor", 1L, actorEmitter);
+        firstListConnection.updateInterestIfNewer(RealtimeInterestType.POST_LIST, null, 1L);
+        secondListConnection.updateInterestIfNewer(RealtimeInterestType.POST_LIST, null, 1L);
+        detailConnection.updateInterestIfNewer(RealtimeInterestType.POST_DETAIL, 10L, 1L);
+        actorConnection.updateInterestIfNewer(RealtimeInterestType.POST_LIST, null, 1L);
+        when(registry.findAll()).thenReturn(List.of(
+                firstListConnection,
+                secondListConnection,
+                detailConnection,
+                actorConnection
+        ));
+        PostCreatedEvent event = new PostCreatedEvent(
+                "post-event-1",
+                10L,
+                1L,
+                Instant.parse("2026-07-31T10:00:00Z")
+        );
+
+        service.sendPostCreated(event);
+
+        ArgumentCaptor<SseEmitter.SseEventBuilder> eventCaptor =
+                ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        verify(firstListEmitter).send(eventCaptor.capture());
+        verify(secondListEmitter).send(any(SseEmitter.SseEventBuilder.class));
+        verify(detailEmitter, never()).send(any(SseEmitter.SseEventBuilder.class));
+        verify(actorEmitter, never()).send(any(SseEmitter.SseEventBuilder.class));
+
+        List<Object> eventParts = eventCaptor.getValue().build().stream()
+                .map(SseEmitter.DataWithMediaType::getData)
+                .toList();
+        assertThat(eventParts.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .anyMatch(part -> part.contains("event:post-created"))).isTrue();
+        assertThat(eventParts).contains(event);
+    }
+
+    @Test
+    @DisplayName("comment-created는 작성자를 제외한 같은 게시글의 POST_DETAIL 연결에만 전송한다")
+    void sendsCommentCreatedOnlyToMatchingPostDetailConnectionsExceptActor() throws Exception {
+        SseEmitter matchingEmitter = mock(SseEmitter.class);
+        SseEmitter otherPostEmitter = mock(SseEmitter.class);
+        SseEmitter listEmitter = mock(SseEmitter.class);
+        SseEmitter actorEmitter = mock(SseEmitter.class);
+        RealtimeConnection matchingConnection =
+                new RealtimeConnection("matching", 2L, matchingEmitter);
+        RealtimeConnection otherPostConnection =
+                new RealtimeConnection("other-post", 3L, otherPostEmitter);
+        RealtimeConnection listConnection =
+                new RealtimeConnection("list", 4L, listEmitter);
+        RealtimeConnection actorConnection =
+                new RealtimeConnection("actor", 1L, actorEmitter);
+        matchingConnection.updateInterestIfNewer(RealtimeInterestType.POST_DETAIL, 10L, 1L);
+        otherPostConnection.updateInterestIfNewer(RealtimeInterestType.POST_DETAIL, 11L, 1L);
+        listConnection.updateInterestIfNewer(RealtimeInterestType.POST_LIST, null, 1L);
+        actorConnection.updateInterestIfNewer(RealtimeInterestType.POST_DETAIL, 10L, 1L);
+        when(registry.findAll()).thenReturn(List.of(
+                matchingConnection,
+                otherPostConnection,
+                listConnection,
+                actorConnection
+        ));
+        CommentCreatedEvent event = new CommentCreatedEvent(
+                "comment-event-1",
+                10L,
+                20L,
+                5L,
+                1L,
+                Instant.parse("2026-07-31T10:01:00Z")
+        );
+
+        service.sendCommentCreated(event);
+
+        ArgumentCaptor<SseEmitter.SseEventBuilder> eventCaptor =
+                ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
+        verify(matchingEmitter).send(eventCaptor.capture());
+        verify(otherPostEmitter, never()).send(any(SseEmitter.SseEventBuilder.class));
+        verify(listEmitter, never()).send(any(SseEmitter.SseEventBuilder.class));
+        verify(actorEmitter, never()).send(any(SseEmitter.SseEventBuilder.class));
+
+        List<Object> eventParts = eventCaptor.getValue().build().stream()
+                .map(SseEmitter.DataWithMediaType::getData)
+                .toList();
+        assertThat(eventParts.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .anyMatch(part -> part.contains("event:comment-created"))).isTrue();
+        assertThat(eventParts).contains(event);
     }
 }

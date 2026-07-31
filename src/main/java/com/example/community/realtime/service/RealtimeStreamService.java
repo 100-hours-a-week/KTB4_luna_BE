@@ -6,6 +6,8 @@ import com.example.community.global.exceptions.InvalidInputException;
 import com.example.community.realtime.connection.RealtimeConnection;
 import com.example.community.realtime.connection.RealtimeConnectionRegistry;
 import com.example.community.realtime.connection.RealtimeInterestType;
+import com.example.community.realtime.event.CommentCreatedEvent;
+import com.example.community.realtime.event.PostCreatedEvent;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -53,6 +55,31 @@ public class RealtimeStreamService {
                 interestType == RealtimeInterestType.POST_DETAIL ? postId : null,
                 interestRevision
         );
+    }
+
+    public void sendPostCreated(PostCreatedEvent event){
+        for(RealtimeConnection connection : registry.findAll()){
+            if(connection.getUserId() == event.actorUserId() || connection.getInterestType() != RealtimeInterestType.POST_LIST) continue;
+            SseEmitter.SseEventBuilder sseEvent = SseEmitter.event()
+                    .id(event.eventId())
+                    .name("post-created")
+                    .data(event);
+            sendEventToClient(connection.getConnectionId(), connection.getEmitter(), sseEvent);
+        }
+    }
+
+    public void sendCommentCreated(CommentCreatedEvent event){
+        for(RealtimeConnection connection : registry.findAll()){
+            if(connection.getUserId() == event.actorUserId()
+                    || connection.getInterestType() != RealtimeInterestType.POST_DETAIL
+                    || !event.postId().equals(connection.getPostId())) continue;
+
+            SseEmitter.SseEventBuilder sseEvent = SseEmitter.event()
+                    .id(event.eventId())
+                    .name("comment-created")
+                    .data(event);
+            sendEventToClient(connection.getConnectionId(), connection.getEmitter(), sseEvent);
+        }
     }
 
     @Scheduled(fixedDelay=25_000)
