@@ -21,7 +21,6 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -311,8 +310,7 @@ class RealtimeStreamServiceTest {
         PostCreatedEvent event = new PostCreatedEvent(
                 "post-event-1",
                 10L,
-                1L,
-                Instant.parse("2026-07-31T10:00:00Z")
+                1L
         );
 
         service.sendPostCreated(event);
@@ -331,7 +329,13 @@ class RealtimeStreamServiceTest {
                 .filter(String.class::isInstance)
                 .map(String.class::cast)
                 .anyMatch(part -> part.contains("event:post-created"))).isTrue();
-        assertThat(eventParts).contains(event);
+        assertThat(eventParts.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .anyMatch(part -> part.contains("id:post-event-1"))).isTrue();
+        assertThat(eventParts).contains(Map.of("postId", 10L));
+        assertThat(eventParts).noneMatch(part -> part instanceof Map<?, ?> map
+                && (map.containsKey("actorUserId") || map.containsKey("post")));
     }
 
     @Test
@@ -343,6 +347,30 @@ class RealtimeStreamServiceTest {
 
         assertThat(listener).isNotNull();
         assertThat(listener.phase()).isEqualTo(TransactionPhase.AFTER_COMMIT);
+    }
+
+    @Test
+    @DisplayName("post-created 전송 중 한 연결이 실패해도 다른 연결에는 계속 전송한다")
+    void postCreatedFailureDoesNotBlockOtherConnections() throws Exception {
+        SseEmitter failedEmitter = mock(SseEmitter.class);
+        SseEmitter activeEmitter = mock(SseEmitter.class);
+        RealtimeConnection failedConnection = new RealtimeConnection("failed", 2L, failedEmitter);
+        RealtimeConnection activeConnection = new RealtimeConnection("active", 3L, activeEmitter);
+        failedConnection.updateInterestIfNewer(RealtimeInterestType.POST_LIST, null, 1L);
+        activeConnection.updateInterestIfNewer(RealtimeInterestType.POST_LIST, null, 1L);
+        when(registry.findAll()).thenReturn(List.of(failedConnection, activeConnection));
+        doThrow(new IOException("post event failed"))
+                .when(failedEmitter)
+                .send(any(SseEmitter.SseEventBuilder.class));
+
+        service.sendPostCreated(new PostCreatedEvent(
+                "post-event-2",
+                10L,
+                1L
+        ));
+
+        verify(registry).remove("failed", failedEmitter);
+        verify(activeEmitter).send(any(SseEmitter.SseEventBuilder.class));
     }
 
     @Test
@@ -374,9 +402,7 @@ class RealtimeStreamServiceTest {
                 "comment-event-1",
                 10L,
                 20L,
-                5L,
-                1L,
-                Instant.parse("2026-07-31T10:01:00Z")
+                1L
         );
 
         service.sendCommentCreated(event);
@@ -395,6 +421,38 @@ class RealtimeStreamServiceTest {
                 .filter(String.class::isInstance)
                 .map(String.class::cast)
                 .anyMatch(part -> part.contains("event:comment-created"))).isTrue();
-        assertThat(eventParts).contains(event);
+        assertThat(eventParts.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .anyMatch(part -> part.contains("id:comment-event-1"))).isTrue();
+        assertThat(eventParts).contains(Map.of("postId", 10L, "commentId", 20L));
+        assertThat(eventParts).noneMatch(part -> part instanceof Map<?, ?> map
+                && (map.containsKey("actorUserId")
+                || map.containsKey("commentId") && map.containsKey("parentCommentId")));
+    }
+
+    @Test
+    @DisplayName("comment-created 전송 중 한 연결이 실패해도 다른 연결에는 계속 전송한다")
+    void commentCreatedFailureDoesNotBlockOtherConnections() throws Exception {
+        SseEmitter failedEmitter = mock(SseEmitter.class);
+        SseEmitter activeEmitter = mock(SseEmitter.class);
+        RealtimeConnection failedConnection = new RealtimeConnection("failed", 2L, failedEmitter);
+        RealtimeConnection activeConnection = new RealtimeConnection("active", 3L, activeEmitter);
+        failedConnection.updateInterestIfNewer(RealtimeInterestType.POST_DETAIL, 10L, 1L);
+        activeConnection.updateInterestIfNewer(RealtimeInterestType.POST_DETAIL, 10L, 1L);
+        when(registry.findAll()).thenReturn(List.of(failedConnection, activeConnection));
+        doThrow(new IllegalStateException("comment event failed"))
+                .when(failedEmitter)
+                .send(any(SseEmitter.SseEventBuilder.class));
+
+        service.sendCommentCreated(new CommentCreatedEvent(
+                "comment-event-2",
+                10L,
+                21L,
+                1L
+        ));
+
+        verify(registry).remove("failed", failedEmitter);
+        verify(activeEmitter).send(any(SseEmitter.SseEventBuilder.class));
     }
 }

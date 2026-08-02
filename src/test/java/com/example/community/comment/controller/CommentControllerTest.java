@@ -49,7 +49,7 @@ public class CommentControllerTest {
 
     Authentication authentication;
     CommentResponseDTO responseDTO = new CommentResponseDTO(
-            new AuthorDTO(UserStatus.ACTIVE, "commenter", ""),
+            new AuthorDTO(2L, UserStatus.ACTIVE, "commenter", ""),
             new CommentDTO(
                     1L,
                     null,
@@ -98,7 +98,7 @@ public class CommentControllerTest {
     @DisplayName("대댓글 작성 요청과 응답에 직접 부모 ID를 사용한다.")
     void uploadReplyComment_withParentCommentId() throws Exception {
         CommentResponseDTO replyResponse = new CommentResponseDTO(
-                new AuthorDTO(UserStatus.ACTIVE, "commenter", ""),
+                new AuthorDTO(2L, UserStatus.ACTIVE, "commenter", ""),
                 new CommentDTO(
                         2L,
                         1L,
@@ -201,6 +201,7 @@ public class CommentControllerTest {
                         .with(authentication(authentication)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("comments_get_success"))
+                .andExpect(jsonPath("$.data[0].author.userId").value(2L))
                 .andExpect(jsonPath("$.data[0].author.nickname").value("commenter"))
                 .andExpect(jsonPath("$.data[0].comment.commentId").value(1L))
                 .andExpect(jsonPath("$.data[0].comment.parentCommentId").value(nullValue()))
@@ -236,7 +237,7 @@ public class CommentControllerTest {
     @DisplayName("댓글 수정 성공 시 200")
     void modifyComment_success_returns200() throws Exception {
         CommentResponseDTO responseDTO = new CommentResponseDTO(
-                new AuthorDTO(UserStatus.ACTIVE, "commenter", ""),
+                new AuthorDTO(2L, UserStatus.ACTIVE, "commenter", ""),
                 new CommentDTO(
                         1L,
                         null,

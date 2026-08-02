@@ -5,6 +5,7 @@ import com.example.community.global.config.SecurityConfig;
 import com.example.community.global.config.filter.JwtFilter;
 import com.example.community.global.exceptions.ContentNotFoundException;
 import com.example.community.global.exceptions.ForbiddenException;
+import com.example.community.global.exceptions.InvalidInputException;
 import com.example.community.realtime.connection.RealtimeInterestType;
 import com.example.community.realtime.service.RealtimeStreamService;
 import org.junit.jupiter.api.BeforeEach;
@@ -205,6 +206,71 @@ class RealtimeStreamControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(realtimeStreamService);
+    }
+
+    @Test
+    @DisplayName("알 수 없는 관심 상태 type은 400으로 거부한다")
+    void rejectsUnknownInterestType() throws Exception {
+        mockMvc.perform(patch("/api/realtime/connections/connection-1/interest")
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "type": "UNKNOWN",
+                                    "revision": 1
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(realtimeStreamService);
+    }
+
+    @Test
+    @DisplayName("POST_DETAIL의 유효하지 않은 postId는 400으로 반환한다")
+    void rejectsInvalidPostIdForPostDetail() throws Exception {
+        when(realtimeStreamService.updateInterest(
+                1L,
+                "connection-1",
+                RealtimeInterestType.POST_DETAIL,
+                0L,
+                1L
+        )).thenThrow(new InvalidInputException());
+
+        mockMvc.perform(patch("/api/realtime/connections/connection-1/interest")
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "type": "POST_DETAIL",
+                                    "postId": 0,
+                                    "revision": 1
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("오래된 revision은 200과 false를 반환한다")
+    void returnsFalseWhenRevisionIsStale() throws Exception {
+        when(realtimeStreamService.updateInterest(
+                1L,
+                "connection-1",
+                RealtimeInterestType.POST_LIST,
+                null,
+                1L
+        )).thenReturn(false);
+
+        mockMvc.perform(patch("/api/realtime/connections/connection-1/interest")
+                        .with(authentication(authentication))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "type": "POST_LIST",
+                                    "revision": 1
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(false));
     }
 
     @Test

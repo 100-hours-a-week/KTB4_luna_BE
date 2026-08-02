@@ -222,7 +222,6 @@ public class PostDraftServiceTest {
         assertThat(eventCaptor.getValue().postId()).isEqualTo(1L);
         assertThat(eventCaptor.getValue().actorUserId()).isEqualTo(1L);
         assertThat(eventCaptor.getValue().eventId()).isNotBlank();
-        assertThat(eventCaptor.getValue().occurredAt()).isNotNull();
     }
 
     @Test

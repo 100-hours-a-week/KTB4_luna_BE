@@ -23,7 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
-import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -70,10 +69,9 @@ public class PostDraftService {
         eventPublisher.publishEvent(new PostCreatedEvent(
                 UUID.randomUUID().toString(),
                 post.getPostId(),
-                author.getUserId(),
-                Instant.now()
+                author.getUserId()
         ));
-        return new PostResponseDTO(new AuthorDTO(author.getStatus(), author.getNickname(), author.getProfileImageUrl()), new PostDTO(post));
+        return new PostResponseDTO(new AuthorDTO(author.getUserId(), author.getStatus(), author.getNickname(), author.getProfileImageUrl()), new PostDTO(post));
     }
 
     // ----------------------------------- 임시작성글 생성 -----------------------------------
