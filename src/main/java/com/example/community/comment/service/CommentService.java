@@ -15,16 +15,20 @@ import com.example.community.global.exceptions.NotRegisteredException;
 import com.example.community.global.mapper.AuthorMapper;
 import com.example.community.post.entity.Post;
 import com.example.community.post.repository.PostRepository;
+import com.example.community.realtime.event.CommentCreatedEvent;
 import com.example.community.user.entity.User;
 import com.example.community.user.repository.UserRepository;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -36,14 +40,16 @@ public class CommentService {
     private final AuthValidator authValidator;
     private final CommentFactory commentFactory;
     private final AuthorMapper authorMapper;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public CommentService(CommentRepository commentRepository, UserRepository userRepository, PostRepository postRepository, AuthValidator authValidator, CommentFactory commentFactory, AuthorMapper authorMapper) {
+    public CommentService(CommentRepository commentRepository, UserRepository userRepository, PostRepository postRepository, AuthValidator authValidator, CommentFactory commentFactory, AuthorMapper authorMapper, ApplicationEventPublisher eventPublisher) {
         this.commentRepository = commentRepository;
         this.userRepository = userRepository;
         this.postRepository = postRepository;
         this.authValidator = authValidator;
         this.commentFactory = commentFactory;
         this.authorMapper = authorMapper;
+        this.eventPublisher = eventPublisher;
     }
     // ----------------------------------- 댓글 작성 -----------------------------------
     @Transactional
@@ -60,6 +66,14 @@ public class CommentService {
         Comment comment = commentFactory.create(author, post, parentComment, commentRequestDTO);
         commentRepository.save(comment);
         post.increaseComments();
+        eventPublisher.publishEvent(new CommentCreatedEvent(
+                UUID.randomUUID().toString(),
+                post.getPostId(),
+                comment.getCommentId(),
+                parentComment == null ? null : parentComment.getCommentId(),
+                author.getUserId(),
+                Instant.now()
+        ));
         return new CommentResponseDTO(authorMapper.toAuthorDTO(author), toCommentDTO(comment));
     }
     // ----------------------------------- 댓글 조회 -----------------------------------

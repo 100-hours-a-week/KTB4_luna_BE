@@ -15,13 +15,17 @@ import com.example.community.post.dto.PostResponseDTO;
 import com.example.community.post.entity.Post;
 import com.example.community.post.factory.PostFactory;
 import com.example.community.post.repository.PostRepository;
+import com.example.community.realtime.event.PostCreatedEvent;
 import com.example.community.user.entity.User;
 import com.example.community.user.repository.UserRepository;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @Validated
@@ -32,14 +36,16 @@ public class PostDraftService {
     private final UserRepository userRepository;
     private final PostFactory postFactory;
     private final PostRepository postRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public PostDraftService(PostDraftFactory postDraftFactory, PostDraftRepository postDraftRepository, AuthValidator authValidator, UserRepository userRepository, PostFactory postFactory, PostRepository postRepository) {
+    public PostDraftService(PostDraftFactory postDraftFactory, PostDraftRepository postDraftRepository, AuthValidator authValidator, UserRepository userRepository, PostFactory postFactory, PostRepository postRepository, ApplicationEventPublisher eventPublisher) {
         this.postDraftFactory = postDraftFactory;
         this.postDraftRepository = postDraftRepository;
         this.authValidator = authValidator;
         this.userRepository = userRepository;
         this.postFactory = postFactory;
         this.postRepository = postRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     // ----------------------------------- 임시작성글 조회 -----------------------------------
@@ -61,7 +67,12 @@ public class PostDraftService {
 
         // 임시저장글 삭제.
         postDraftRepository.delete(postDraft);
-
+        eventPublisher.publishEvent(new PostCreatedEvent(
+                UUID.randomUUID().toString(),
+                post.getPostId(),
+                author.getUserId(),
+                Instant.now()
+        ));
         return new PostResponseDTO(new AuthorDTO(author.getStatus(), author.getNickname(), author.getProfileImageUrl()), new PostDTO(post));
     }
 

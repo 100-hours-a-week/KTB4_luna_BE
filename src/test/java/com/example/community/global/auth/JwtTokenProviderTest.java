@@ -62,4 +62,25 @@ public class JwtTokenProviderTest {
     void invalidTokenTest(){
         assertThat(jwtTokenProvider.validateToken("invalid_token")).isFalse();
     }
+
+    @Test
+    @DisplayName("Access Token의 남은 유효시간을 밀리초로 반환한다")
+    void getsRemainingAccessTokenValidityMillis() {
+        User user = new User(1L, "test", "", UserRole.ROLE_USER, UserStatus.ACTIVE);
+        String accessToken = jwtTokenProvider.createAccessToken(user);
+
+        long remainingMillis = jwtTokenProvider.getRemainingValidityMillis(accessToken);
+
+        assertThat(remainingMillis).isBetween(1L, 3000L);
+    }
+
+    @Test
+    @DisplayName("만료된 Access Token의 남은 유효시간은 0이다")
+    void expiredAccessTokenHasNoRemainingValidity() {
+        JwtTokenProvider expiredProvider = new JwtTokenProvider(TEST_SECRET, 0L, 1000L);
+        User user = new User(1L, "test", "", UserRole.ROLE_USER, UserStatus.ACTIVE);
+        String accessToken = expiredProvider.createAccessToken(user);
+
+        assertThat(expiredProvider.getRemainingValidityMillis(accessToken)).isZero();
+    }
 }

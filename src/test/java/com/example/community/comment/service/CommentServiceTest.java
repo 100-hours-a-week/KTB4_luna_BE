@@ -16,6 +16,7 @@ import com.example.community.global.exceptions.NotRegisteredException;
 import com.example.community.global.mapper.AuthorMapper;
 import com.example.community.post.entity.Post;
 import com.example.community.post.repository.PostRepository;
+import com.example.community.realtime.event.CommentCreatedEvent;
 import com.example.community.user.entity.User;
 import com.example.community.user.entity.UserRole;
 import com.example.community.user.entity.UserStatus;
@@ -24,9 +25,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -52,6 +55,8 @@ public class CommentServiceTest {
     AuthValidator authValidator;
     @Mock
     AuthorMapper authorMapper;
+    @Mock
+    ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     CommentService commentService;
@@ -93,6 +98,38 @@ public class CommentServiceTest {
         assertThat(response.getComment().getParentCommentId()).isNull();
         assertThat(post.getComments()).isEqualTo(1);
         verify(commentRepository, never()).findCommentWithPost(anyLong(), anyLong());
+
+        ArgumentCaptor<CommentCreatedEvent> eventCaptor = ArgumentCaptor.forClass(CommentCreatedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().postId()).isEqualTo(post.getPostId());
+        assertThat(eventCaptor.getValue().commentId()).isEqualTo(comment.getCommentId());
+        assertThat(eventCaptor.getValue().parentCommentId()).isNull();
+        assertThat(eventCaptor.getValue().actorUserId()).isEqualTo(commenter.getUserId());
+        assertThat(eventCaptor.getValue().eventId()).isNotBlank();
+        assertThat(eventCaptor.getValue().occurredAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("대댓글 작성 시 직접 부모 ID를 포함한 comment-created를 발행한다")
+    void uploadReply_publishesParentCommentId() {
+        Comment parent = new Comment(commenter, post, null, "parent comment");
+        ReflectionTestUtils.setField(parent, "commentId", 10L);
+        Comment reply = new Comment(commenter, post, parent, "reply");
+        ReflectionTestUtils.setField(reply, "commentId", 11L);
+        CommentRequestDTO request = commentRequest("reply", parent.getCommentId());
+        when(userRepository.findById(commenter.getUserId())).thenReturn(Optional.of(commenter));
+        when(postRepository.findById(post.getPostId())).thenReturn(Optional.of(post));
+        when(commentRepository.findCommentWithPost(post.getPostId(), parent.getCommentId())).thenReturn(Optional.of(parent));
+        when(commentFactory.create(commenter, post, parent, request)).thenReturn(reply);
+
+        commentService.uploadComment(post.getPostId(), commenter.getUserId(), request);
+
+        ArgumentCaptor<CommentCreatedEvent> eventCaptor = ArgumentCaptor.forClass(CommentCreatedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertThat(eventCaptor.getValue().postId()).isEqualTo(post.getPostId());
+        assertThat(eventCaptor.getValue().commentId()).isEqualTo(reply.getCommentId());
+        assertThat(eventCaptor.getValue().parentCommentId()).isEqualTo(parent.getCommentId());
+        assertThat(eventCaptor.getValue().actorUserId()).isEqualTo(commenter.getUserId());
     }
 
     @Test
@@ -135,6 +172,7 @@ public class CommentServiceTest {
         verify(commentRepository).save(firstReply);
         verify(commentRepository).save(secondReply);
         verify(commentRepository).save(nestedReply);
+        verify(eventPublisher, times(3)).publishEvent(any(CommentCreatedEvent.class));
     }
 
     @Test
@@ -151,6 +189,8 @@ public class CommentServiceTest {
         assertThat(post.getComments()).isZero();
         verify(commentFactory, never()).create(any(), any(), any(), any());
         verify(commentRepository, never()).save(any(Comment.class));
+        verify(eventPublisher, never()).publishEvent(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -172,6 +212,7 @@ public class CommentServiceTest {
         verify(commentRepository).findCommentWithPost(post.getPostId(), otherPostComment.getCommentId());
         verify(commentFactory, never()).create(any(), any(), any(), any());
         verify(commentRepository, never()).save(any(Comment.class));
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -203,6 +244,7 @@ public class CommentServiceTest {
         verify(postRepository, never()).findById(anyLong());
         verify(commentFactory, never()).create(any(), any(), any(), any());
         verify(commentRepository, never()).save(any(Comment.class));
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -215,6 +257,7 @@ public class CommentServiceTest {
 
         verify(commentFactory, never()).create(any(), any(), any(), any());
         verify(commentRepository, never()).save(any(Comment.class));
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -229,6 +272,7 @@ public class CommentServiceTest {
         assertThatThrownBy(()->commentService.uploadComment(post.getPostId(), commenter.getUserId(), commentRequestDTO)).isSameAs(saveException);
         assertThat(post.getComments()).isEqualTo(0);
         verify(commentRepository).save(comment);
+        verify(eventPublisher, never()).publishEvent(any());
     }
     @Test
     @DisplayName("댓글 조회 성공")
@@ -245,10 +289,10 @@ public class CommentServiceTest {
         List<CommentResponseDTO> response = commentService.getComments(post.getPostId());
 
         assertThat(response).hasSize(3);
-        assertThat(response.get(0).getAuthor().getNickname()).isEqualTo("commenter");
-        assertThat(response.get(0).getComment().getCommentId()).isEqualTo(comment.getCommentId());
-        assertThat(response.get(0).getComment().getParentCommentId()).isNull();
-        assertThat(response.get(0).getComment().getCommentBody()).isEqualTo("test comment");
+        assertThat(response.getFirst().getAuthor().getNickname()).isEqualTo("commenter");
+        assertThat(response.getFirst().getComment().getCommentId()).isEqualTo(comment.getCommentId());
+        assertThat(response.getFirst().getComment().getParentCommentId()).isNull();
+        assertThat(response.getFirst().getComment().getCommentBody()).isEqualTo("test comment");
         assertThat(response.get(0).getComment().isModified()).isFalse();
         assertThat(response.get(0).getComment().isDeleted()).isFalse();
         assertThat(response.get(1).getComment().getParentCommentId()).isEqualTo(comment.getCommentId());

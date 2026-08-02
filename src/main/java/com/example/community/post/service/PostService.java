@@ -13,17 +13,21 @@ import com.example.community.post.repository.PostLikeRepository;
 import com.example.community.post.repository.PostRepository;
 import com.example.community.post.repository.PostRevisionRepository;
 import com.example.community.post.repository.ReportRepository;
+import com.example.community.realtime.event.PostCreatedEvent;
 import com.example.community.user.entity.User;
 import com.example.community.user.entity.UserRole;
 import com.example.community.user.repository.UserRepository;
 import jakarta.validation.Valid;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @Validated
@@ -38,11 +42,13 @@ public class PostService {
     private final ReportFactory reportFactory;
     private final PostRevisionRepository postRevisionRepository;
     private final AuthorMapper authorMapper;
+
+    private final ApplicationEventPublisher eventPublisher;
     // 테스트 환경을 위해 1로 설정.
     private final int REPORT_BLIND_LIMIT = 1;
     private final PostLikeFactory postLikeFactory;
 
-    public PostService(PostRepository postRepository, AuthValidator authValidator, UserRepository userRepository, PostFactory postFactory, PostLikeRepository postLikeRepository, ReportRepository reportRepository, ReportFactory reportFactory, PostRevisionRepository postRevisionRepository, AuthorMapper authorMapper, PostLikeFactory postLikeFactory) {
+    public PostService(PostRepository postRepository, AuthValidator authValidator, UserRepository userRepository, PostFactory postFactory, PostLikeRepository postLikeRepository, ReportRepository reportRepository, ReportFactory reportFactory, PostRevisionRepository postRevisionRepository, AuthorMapper authorMapper, ApplicationEventPublisher eventPublisher, PostLikeFactory postLikeFactory) {
         this.postRepository = postRepository;
         this.authValidator = authValidator;
         this.userRepository = userRepository;
@@ -52,6 +58,7 @@ public class PostService {
         this.reportFactory = reportFactory;
         this.postRevisionRepository = postRevisionRepository;
         this.authorMapper = authorMapper;
+        this.eventPublisher = eventPublisher;
         this.postLikeFactory = postLikeFactory;
     }
     // ----------------------------------- 게시물 업로드 -----------------------------------
@@ -61,6 +68,13 @@ public class PostService {
 
         Post post = postFactory.create(author, postRequestDTO);
         postRepository.save(post);
+
+        eventPublisher.publishEvent(new PostCreatedEvent(
+                UUID.randomUUID().toString(),
+                post.getPostId(),
+                author.getUserId(),
+                Instant.now()
+        ));
 
         return new PostResponseDTO(authorMapper.toAuthorDTO(author), new PostDTO(post));
     }
