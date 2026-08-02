@@ -71,7 +71,7 @@ public class PostDraftService {
                 post.getPostId(),
                 author.getUserId()
         ));
-        return new PostResponseDTO(new AuthorDTO(author.getStatus(), author.getNickname(), author.getProfileImageUrl()), new PostDTO(post));
+        return new PostResponseDTO(new AuthorDTO(author.getUserId(), author.getStatus(), author.getNickname(), author.getProfileImageUrl()), new PostDTO(post));
     }
 
     // ----------------------------------- 임시작성글 생성 -----------------------------------
