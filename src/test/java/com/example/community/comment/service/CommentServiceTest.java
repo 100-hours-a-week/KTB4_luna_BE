@@ -281,7 +281,7 @@ public class CommentServiceTest {
         when(postRepository.findById(post.getPostId())).thenReturn(Optional.of(post));
         when(commentRepository.findListByPost(post.getPostId())).thenReturn(List.of(comment, reply, nestedReply));
         when(userRepository.findById(commenter.getUserId())).thenReturn(Optional.of(commenter));
-        when(authorMapper.toAuthorDTO(commenter)).thenReturn(new AuthorDTO(UserStatus.ACTIVE, "commenter", ""));
+        when(authorMapper.toAuthorDTO(commenter)).thenReturn(new AuthorDTO(2L, UserStatus.ACTIVE, "commenter", ""));
 
         List<CommentResponseDTO> response = commentService.getComments(post.getPostId());
 

@@ -215,6 +215,7 @@ class PostIntegrationTest {
                         .header("Authorization", "Bearer " + accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("post_loading_success"))
+                .andExpect(jsonPath("$.data.author.userId").value(user.getUserId()))
                 .andExpect(jsonPath("$.data.author.nickname").value("user"))
                 .andExpect(jsonPath("$.data.post.title").value("test title"))
                 .andExpect(jsonPath("$.data.post.postBody").value("test body"))

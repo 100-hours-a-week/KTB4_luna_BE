@@ -88,7 +88,7 @@ class PostServiceTest {
         post = new Post(user, "title", "body", "");
         ReflectionTestUtils.setField(post, "postId", 1L);
 
-        authorDTO = new AuthorDTO(UserStatus.ACTIVE, "tester", "");
+        authorDTO = new AuthorDTO(1L, UserStatus.ACTIVE, "tester", "");
 
         postRequestDTO = postRequest("title", "body", "");
 

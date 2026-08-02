@@ -219,7 +219,7 @@ public class PostDraftControllerTest {
         ReflectionTestUtils.setField(post, "postId", 1L);
 
         PostResponseDTO postResponseDTO = new PostResponseDTO(
-                new AuthorDTO(UserStatus.ACTIVE, "author", ""),
+                new AuthorDTO(1L, UserStatus.ACTIVE, "author", ""),
                 new PostDTO(post)
         );
 

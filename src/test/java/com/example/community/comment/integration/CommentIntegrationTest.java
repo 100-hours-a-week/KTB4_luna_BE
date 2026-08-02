@@ -151,6 +151,7 @@ public class CommentIntegrationTest {
                         .header("Authorization", "Bearer "+accessToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("comments_get_success"))
+                .andExpect(jsonPath("$.data[0].author.userId").value(commenter.getUserId()))
                 .andExpect(jsonPath("$.data[0].author.nickname").value("commenter"))
                 .andExpect(jsonPath("$.data[0].comment.parentCommentId").value(nullValue()))
                 .andExpect(jsonPath("$.data[0].comment.commentBody").value("test comment"));

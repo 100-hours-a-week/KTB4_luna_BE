@@ -76,7 +76,7 @@ class PostControllerTest {
         post = new Post(user, "title", "body", "");
         ReflectionTestUtils.setField(post, "postId", 1L);
 
-        authorDTO = new AuthorDTO(UserStatus.ACTIVE, "tester", "");
+        authorDTO = new AuthorDTO(1L, UserStatus.ACTIVE, "tester", "");
 
         postResponseDTO = new PostResponseDTO(authorDTO, new PostDTO(post));
         postDetailResponseDTO = new PostDetailResponseDTO(
@@ -216,6 +216,7 @@ class PostControllerTest {
                         .with(authentication(userAuthentication)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("post_loading_success"))
+                .andExpect(jsonPath("$.data.author.userId").value(1L))
                 .andExpect(jsonPath("$.data.author.nickname").value("tester"))
                 .andExpect(jsonPath("$.data.post.postId").value(1L))
                 .andExpect(jsonPath("$.data.post.title").value("title"));
