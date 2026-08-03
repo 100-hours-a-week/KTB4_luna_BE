@@ -152,7 +152,7 @@ public class UserControllerTest {
     @Test
     @DisplayName("로그아웃 시 토큰이 유효하지 않으면 401")
     void logout_invalidToken_returns401() throws Exception {
-        when(jwtTokenProvider.validateToken("invalid-token")).thenReturn(false);
+        when(jwtTokenProvider.validateAccessToken("invalid-token")).thenReturn(false);
 
         mockMvc.perform(post("/api/users/logout")
                         .header("Authorization", "Bearer invalid-token"))

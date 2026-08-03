@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -90,7 +91,7 @@ public class UserServiceTest {
     void login_returnsToken(){
         when(userCredentialRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(credential));
         when(passwordEncoder.matches("Test1234!", "encoded-password")).thenReturn(true);
-        when(jwtTokenProvider.createJwtToken(user)).thenReturn(jwtToken);
+        when(jwtTokenProvider.createJwtToken(eq(user), anyString())).thenReturn(jwtToken);
 
         LoginResponseDTO response = userService.login(loginRequest);
 
@@ -98,7 +99,9 @@ public class UserServiceTest {
         assertThat(response.getToken()).isEqualTo(jwtToken);
         assertThat(response.getNickname()).isEqualTo("tester");
 
-        verify(jwtTokenProvider).createJwtToken(user);
+        ArgumentCaptor<String> sessionIdCaptor = ArgumentCaptor.forClass(String.class);
+        verify(jwtTokenProvider).createJwtToken(eq(user), sessionIdCaptor.capture());
+        assertThat(sessionIdCaptor.getValue()).isNotBlank();
         verify(passwordEncoder).matches("Test1234!", "encoded-password");
     }
     @Test

@@ -54,7 +54,7 @@ public class JwtFilterTest {
                         List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))
                 );
 
-        when(jwtTokenProvider.validateToken("valid-jwt-token")).thenReturn(true);
+        when(jwtTokenProvider.validateAccessToken("valid-jwt-token")).thenReturn(true);
         when(jwtTokenProvider.getAuthentication("valid-jwt-token")).thenReturn(mockAuthentication);
         jwtFilter.doFilter(request, response, chain);
 
@@ -72,7 +72,7 @@ public class JwtFilterTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
 
-        when(jwtTokenProvider.validateToken("invalid-jwt-token")).thenReturn(false);
+        when(jwtTokenProvider.validateAccessToken("invalid-jwt-token")).thenReturn(false);
 
         jwtFilter.doFilter(request, response, chain);
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
