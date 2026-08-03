@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -23,6 +24,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.hamcrest.Matchers.allOf;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -68,7 +71,16 @@ public class UserControllerTest {
                         """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("user_login_success"))
-                .andExpect(jsonPath("$.data.token.accessToken").value("access-token"));
+                .andExpect(jsonPath("$.data.token.accessToken").value("access-token"))
+                .andExpect(jsonPath("$.data.token.refreshToken").doesNotExist())
+                .andExpect(header().string(HttpHeaders.SET_COOKIE,
+                        allOf(
+                                containsString("refresh_token=refresh-token"),
+                                containsString("Max-Age=604800"),
+                                containsString("Path=/api/users"),
+                                containsString("HttpOnly"),
+                                containsString("SameSite=Lax")
+                        )));
     }
 
     @Test

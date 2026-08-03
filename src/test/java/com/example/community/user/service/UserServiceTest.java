@@ -11,6 +11,9 @@ import com.example.community.user.factory.UserCredentialFactory;
 import com.example.community.user.factory.UserFactory;
 import com.example.community.user.repository.UserCredentialRepository;
 import com.example.community.user.repository.UserRepository;
+import com.example.community.global.auth.session.RefreshSession;
+import com.example.community.global.auth.session.RefreshSessionStore;
+import com.example.community.global.auth.session.RefreshTokenHasher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -36,6 +40,10 @@ public class UserServiceTest {
     UserCredentialRepository userCredentialRepository;
     @Mock
     JwtTokenProvider jwtTokenProvider;
+    @Mock
+    RefreshSessionStore refreshSessionStore;
+    @Mock
+    RefreshTokenHasher refreshTokenHasher;
     @Mock
     AuthValidator authValidator;
     @Mock
@@ -103,6 +111,27 @@ public class UserServiceTest {
         verify(jwtTokenProvider).createJwtToken(eq(user), sessionIdCaptor.capture());
         assertThat(sessionIdCaptor.getValue()).isNotBlank();
         verify(passwordEncoder).matches("Test1234!", "encoded-password");
+    }
+
+    @Test
+    @DisplayName("로그인 성공 시 refresh session을 저장한다.")
+    void login_savesRefreshSession(){
+        when(userCredentialRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(credential));
+        when(passwordEncoder.matches("Test1234!", "encoded-password")).thenReturn(true);
+        when(jwtTokenProvider.createJwtToken(eq(user), anyString())).thenReturn(jwtToken);
+        when(jwtTokenProvider.getRemainingValidityMillis("refresh-token")).thenReturn(604800000L);
+        when(refreshTokenHasher.hash("refresh-token")).thenReturn("refresh-hash");
+
+        userService.login(loginRequest);
+
+        ArgumentCaptor<RefreshSession> sessionCaptor = ArgumentCaptor.forClass(RefreshSession.class);
+        verify(refreshSessionStore).save(sessionCaptor.capture());
+
+        RefreshSession saved = sessionCaptor.getValue();
+        assertThat(saved.userId()).isEqualTo(user.getUserId());
+        assertThat(saved.sessionId()).isNotBlank();
+        assertThat(saved.refreshTokenHash()).isEqualTo("refresh-hash");
+        assertThat(saved.expiresAt()).isAfter(Instant.now());
     }
     @Test
     @DisplayName("이메일이 등록되지 않으면 401")
