@@ -1,6 +1,9 @@
 package com.example.community.user.service;
 
 import com.example.community.global.auth.*;
+import com.example.community.global.auth.session.RefreshSession;
+import com.example.community.global.auth.session.RefreshSessionStore;
+import com.example.community.global.auth.session.RefreshTokenHasher;
 import com.example.community.global.exceptions.*;
 import com.example.community.user.dto.*;
 import com.example.community.user.entity.User;
@@ -16,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -27,15 +31,19 @@ public class UserService {
     private final UserFactory userFactory;
     private final UserCredentialFactory userCredentialFactory;
     private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshSessionStore refreshSessionStore;
+    private final RefreshTokenHasher refreshTokenHasher;
     private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository, UserCredentialRepository userCredentialRepository, AuthValidator authValidator, UserFactory userFactory, UserCredentialFactory userCredentialFactory, JwtTokenProvider jwtTokenProvider, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, UserCredentialRepository userCredentialRepository, AuthValidator authValidator, UserFactory userFactory, UserCredentialFactory userCredentialFactory, JwtTokenProvider jwtTokenProvider, RefreshSessionStore refreshSessionStore, RefreshTokenHasher refreshTokenHasher, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.userCredentialRepository = userCredentialRepository;
         this.authValidator = authValidator;
         this.userFactory = userFactory;
         this.userCredentialFactory = userCredentialFactory;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.refreshSessionStore = refreshSessionStore;
+        this.refreshTokenHasher = refreshTokenHasher;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -54,6 +62,13 @@ public class UserService {
         String sessionId = UUID.randomUUID().toString();
 
         JwtToken token = jwtTokenProvider.createJwtToken(user, sessionId);
+        long refreshValidityMillis = jwtTokenProvider.getRemainingValidityMillis(token.getRefreshToken());
+        refreshSessionStore.save(new RefreshSession(
+                user.getUserId(),
+                sessionId,
+                refreshTokenHasher.hash(token.getRefreshToken()),
+                Instant.now().plusMillis(refreshValidityMillis)
+        ));
 
         return new LoginResponseDTO(user.getUserId(), token, user.getNickname(), user.getProfileImageUrl());
     }
