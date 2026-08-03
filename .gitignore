@@ -14,6 +14,7 @@ build/
 .springBeans
 .sts4-cache
 AGENTS.md
+docs
 bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
