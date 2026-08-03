@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Service
 @Validated
@@ -50,7 +51,9 @@ public class UserService {
         if (!user.isActive()) throw new NotRegisteredException();
         if (!passwordEncoder.matches(password, credential.getPassword())) throw new PasswordInvalidException();
 
-        JwtToken token = jwtTokenProvider.createJwtToken(user);
+        String sessionId = UUID.randomUUID().toString();
+
+        JwtToken token = jwtTokenProvider.createJwtToken(user, sessionId);
 
         return new LoginResponseDTO(user.getUserId(), token, user.getNickname(), user.getProfileImageUrl());
     }
