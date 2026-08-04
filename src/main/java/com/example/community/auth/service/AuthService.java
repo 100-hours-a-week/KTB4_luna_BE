@@ -1,32 +1,77 @@
 package com.example.community.auth.service;
 
+import com.example.community.auth.dto.LoginRequestDTO;
+import com.example.community.auth.dto.LoginResponseDTO;
 import com.example.community.global.security.jwt.JwtToken;
 import com.example.community.global.security.jwt.JwtTokenProvider;
 import com.example.community.auth.session.RefreshSession;
 import com.example.community.auth.session.RefreshSessionStore;
 import com.example.community.auth.session.RefreshTokenHasher;
+import com.example.community.global.exceptions.NotRegisteredException;
+import com.example.community.global.exceptions.PasswordInvalidException;
 import com.example.community.global.exceptions.UnauthorizedException;
 import com.example.community.user.entity.User;
+import com.example.community.user.entity.UserCredential;
+import com.example.community.user.repository.UserCredentialRepository;
 import com.example.community.user.repository.UserRepository;
+import jakarta.validation.Valid;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.UUID;
 
 @Service
 public class AuthService {
+    private final UserCredentialRepository userCredentialRepository;
     private final UserRepository userRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshSessionStore refreshSessionStore;
     private final RefreshTokenHasher refreshTokenHasher;
+    private final PasswordEncoder passwordEncoder;
 
-    public AuthService(UserRepository userRepository, JwtTokenProvider jwtTokenProvider, RefreshSessionStore refreshSessionStore, RefreshTokenHasher refreshTokenHasher) {
+    public AuthService(UserCredentialRepository userCredentialRepository,
+                       UserRepository userRepository,
+                       JwtTokenProvider jwtTokenProvider,
+                       RefreshSessionStore refreshSessionStore,
+                       RefreshTokenHasher refreshTokenHasher,
+                       PasswordEncoder passwordEncoder) {
+        this.userCredentialRepository = userCredentialRepository;
         this.userRepository = userRepository;
         this.jwtTokenProvider = jwtTokenProvider;
         this.refreshSessionStore = refreshSessionStore;
         this.refreshTokenHasher = refreshTokenHasher;
+        this.passwordEncoder = passwordEncoder;
     }
+
+    @Transactional
+    public LoginResponseDTO login(@Valid LoginRequestDTO requestDTO) {
+        String email = requestDTO.getEmail();
+        String password = requestDTO.getPassword();
+
+        UserCredential credential = userCredentialRepository.findByEmail(email).orElseThrow(NotRegisteredException::new);
+        User user = credential.getUser();
+
+        if (!user.isActive()) throw new NotRegisteredException();
+        if (!passwordEncoder.matches(password, credential.getPassword())) throw new PasswordInvalidException();
+
+        String sessionId = UUID.randomUUID().toString();
+
+        JwtToken token = jwtTokenProvider.createJwtToken(user, sessionId);
+        long refreshValidityMillis = jwtTokenProvider.getRemainingValidityMillis(token.getRefreshToken());
+        refreshSessionStore.save(new RefreshSession(
+                user.getUserId(),
+                sessionId,
+                refreshTokenHasher.hash(token.getRefreshToken()),
+                Instant.now().plusMillis(refreshValidityMillis)
+        ));
+
+        return new LoginResponseDTO(user.getUserId(), token, user.getNickname(), user.getProfileImageUrl());
+    }
+
     public JwtToken refresh(String refreshToken){
         if (refreshToken == null || refreshToken.isBlank() || !jwtTokenProvider.validateRefreshToken(refreshToken)) {
             throw new UnauthorizedException();

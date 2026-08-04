@@ -1,13 +1,6 @@
 package com.example.community.user.service;
 
-import com.example.community.auth.dto.LoginRequestDTO;
-import com.example.community.auth.dto.LoginResponseDTO;
-import com.example.community.auth.session.RefreshSession;
-import com.example.community.auth.session.RefreshSessionStore;
-import com.example.community.auth.session.RefreshTokenHasher;
 import com.example.community.global.security.AuthValidator;
-import com.example.community.global.security.jwt.JwtToken;
-import com.example.community.global.security.jwt.JwtTokenProvider;
 import com.example.community.global.exceptions.*;
 import com.example.community.user.dto.*;
 import com.example.community.user.entity.User;
@@ -23,8 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.LocalDateTime;
-import java.time.Instant;
-import java.util.UUID;
 
 @Service
 @Validated
@@ -34,47 +25,15 @@ public class UserService {
     private final AuthValidator authValidator;
     private final UserFactory userFactory;
     private final UserCredentialFactory userCredentialFactory;
-    private final JwtTokenProvider jwtTokenProvider;
-    private final RefreshSessionStore refreshSessionStore;
-    private final RefreshTokenHasher refreshTokenHasher;
     private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository, UserCredentialRepository userCredentialRepository, AuthValidator authValidator, UserFactory userFactory, UserCredentialFactory userCredentialFactory, JwtTokenProvider jwtTokenProvider, RefreshSessionStore refreshSessionStore, RefreshTokenHasher refreshTokenHasher, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, UserCredentialRepository userCredentialRepository, AuthValidator authValidator, UserFactory userFactory, UserCredentialFactory userCredentialFactory, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.userCredentialRepository = userCredentialRepository;
         this.authValidator = authValidator;
         this.userFactory = userFactory;
         this.userCredentialFactory = userCredentialFactory;
-        this.jwtTokenProvider = jwtTokenProvider;
-        this.refreshSessionStore = refreshSessionStore;
-        this.refreshTokenHasher = refreshTokenHasher;
         this.passwordEncoder = passwordEncoder;
-    }
-
-    // ----------------------------------- 로그인, 토큰 생성 -----------------------------------
-    @Transactional
-    public LoginResponseDTO login(@Valid LoginRequestDTO requestDTO) {
-        String email = requestDTO.getEmail();
-        String password = requestDTO.getPassword();
-
-        UserCredential credential = userCredentialRepository.findByEmail(email).orElseThrow(NotRegisteredException::new);
-        User user = credential.getUser();
-
-        if (!user.isActive()) throw new NotRegisteredException();
-        if (!passwordEncoder.matches(password, credential.getPassword())) throw new PasswordInvalidException();
-
-        String sessionId = UUID.randomUUID().toString();
-
-        JwtToken token = jwtTokenProvider.createJwtToken(user, sessionId);
-        long refreshValidityMillis = jwtTokenProvider.getRemainingValidityMillis(token.getRefreshToken());
-        refreshSessionStore.save(new RefreshSession(
-                user.getUserId(),
-                sessionId,
-                refreshTokenHasher.hash(token.getRefreshToken()),
-                Instant.now().plusMillis(refreshValidityMillis)
-        ));
-
-        return new LoginResponseDTO(user.getUserId(), token, user.getNickname(), user.getProfileImageUrl());
     }
     // ----------------------------------- 로그아웃, 토큰 삭제 -----------------------------------
     @Transactional

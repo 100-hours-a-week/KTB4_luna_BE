@@ -57,7 +57,7 @@ public class UserIntegrationTest {
     @Test
     @DisplayName("로그인 요청이 Controller-Service-Repository를 거쳐 JWT를 반환한다.")
     void login_success() throws Exception {
-        mockMvc.perform(post("/api/users/login")
+        mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                         {
@@ -160,7 +160,7 @@ public class UserIntegrationTest {
     }
 
     private String loginAndGetAccessToken() throws Exception {
-        String response = mockMvc.perform(post("/api/users/login")
+        String response = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                         {

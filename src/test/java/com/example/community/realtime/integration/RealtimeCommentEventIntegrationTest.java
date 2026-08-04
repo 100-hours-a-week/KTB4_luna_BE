@@ -2,7 +2,6 @@ package com.example.community.realtime.integration;
 
 import com.example.community.comment.dto.CommentRequestDTO;
 import com.example.community.comment.dto.CommentResponseDTO;
-import com.example.community.comment.entity.Comment;
 import com.example.community.comment.repository.CommentRepository;
 import com.example.community.comment.service.CommentService;
 import com.example.community.post.entity.Post;

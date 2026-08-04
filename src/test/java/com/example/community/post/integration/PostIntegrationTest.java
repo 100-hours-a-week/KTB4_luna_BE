@@ -372,7 +372,7 @@ class PostIntegrationTest {
     }
 
     private String loginAndGetAccessToken(String email) throws Exception {
-        String response = mockMvc.perform(post("/api/users/login")
+        String response = mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                             {

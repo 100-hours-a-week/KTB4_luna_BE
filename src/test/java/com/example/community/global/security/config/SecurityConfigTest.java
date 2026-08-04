@@ -2,7 +2,9 @@ package com.example.community.global.security.config;
 
 import com.example.community.global.security.jwt.JwtToken;
 import com.example.community.global.security.jwt.JwtTokenProvider;
+import com.example.community.auth.controller.AuthController;
 import com.example.community.auth.dto.LoginResponseDTO;
+import com.example.community.auth.service.AuthService;
 import com.example.community.global.controller.AdminController;
 import com.example.community.post.controller.PostController;
 import com.example.community.post.dto.PostPageResponseDTO;
@@ -12,7 +14,6 @@ import com.example.community.user.dto.SignUpRequestDTO;
 import com.example.community.user.dto.SignUpResponseDTO;
 import com.example.community.user.entity.User;
 import com.example.community.user.entity.UserRole;
-import com.example.community.user.entity.UserStatus;
 import com.example.community.user.factory.UserFactory;
 import com.example.community.user.service.UserService;
 import org.junit.jupiter.api.DisplayName;
@@ -34,13 +35,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = {UserController.class, PostController.class, AdminController.class})
+@WebMvcTest(controllers = {AuthController.class, UserController.class, PostController.class, AdminController.class})
 @Import(SecurityConfig.class)
 public class SecurityConfigTest {
     @Autowired
     MockMvc mockMvc;
     @MockitoBean
     UserService userService;
+    @MockitoBean
+    AuthService authService;
     @MockitoBean
     PostService postService;
     @MockitoBean
@@ -51,9 +54,9 @@ public class SecurityConfigTest {
     @Test
     @DisplayName("로그인 요청은 인증 없이도 로그인이 가능하다.")
     void loginRequest_canBeAccessedWithoutLogin() throws Exception {
-        when(userService.login(any())).thenReturn(new LoginResponseDTO(1, new JwtToken("Bearer", "access-token1", "access-token2"), "nickname", ""));
+        when(authService.login(any())).thenReturn(new LoginResponseDTO(1, new JwtToken("Bearer", "access-token1", "access-token2"), "nickname", ""));
 
-        mockMvc.perform(post("/api/users/login").contentType(MediaType.APPLICATION_JSON).content("""
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON).content("""
                     {
                         "email":"test@test.com",
                         "password":"Test1234!"

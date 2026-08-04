@@ -1,13 +1,6 @@
 package com.example.community.user.service;
 
-import com.example.community.auth.dto.LoginRequestDTO;
-import com.example.community.auth.dto.LoginResponseDTO;
-import com.example.community.auth.session.RefreshSession;
-import com.example.community.auth.session.RefreshSessionStore;
-import com.example.community.auth.session.RefreshTokenHasher;
 import com.example.community.global.security.AuthValidator;
-import com.example.community.global.security.jwt.JwtToken;
-import com.example.community.global.security.jwt.JwtTokenProvider;
 import com.example.community.global.exceptions.*;
 import com.example.community.user.dto.*;
 import com.example.community.user.entity.User;
@@ -22,14 +15,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
-import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -42,12 +33,6 @@ public class UserServiceTest {
     UserRepository userRepository;
     @Mock
     UserCredentialRepository userCredentialRepository;
-    @Mock
-    JwtTokenProvider jwtTokenProvider;
-    @Mock
-    RefreshSessionStore refreshSessionStore;
-    @Mock
-    RefreshTokenHasher refreshTokenHasher;
     @Mock
     AuthValidator authValidator;
     @Mock
@@ -63,9 +48,6 @@ public class UserServiceTest {
 
     User user;
     UserCredential credential;
-    JwtToken jwtToken;
-
-    LoginRequestDTO loginRequest;
     SignUpRequestDTO signUpRequest;
     ModifyInfoRequestDTO modifyInfoRequest;
     ModifyPasswordRequestDTO modifyPasswordRequest;
@@ -74,12 +56,6 @@ public class UserServiceTest {
     void setUp() {
         user = new User(1L, "tester", "", UserRole.ROLE_USER, UserStatus.ACTIVE);
         credential = new UserCredential(user, "test@test.com", "encoded-password");
-
-        jwtToken = new JwtToken("Bearer", "access-token", "refresh-token");
-
-        loginRequest = new LoginRequestDTO();
-        loginRequest.setEmail("test@test.com");
-        loginRequest.setPassword("Test1234!");
 
         signUpRequest = new SignUpRequestDTO(
                 "new@test.com",
@@ -96,71 +72,6 @@ public class UserServiceTest {
         modifyPasswordRequest = new ModifyPasswordRequestDTO();
         modifyPasswordRequest.setPassword("New12345!");
         modifyPasswordRequest.setPasswordConfirm("New12345!");
-    }
-
-    @Test
-    @DisplayName("로그인 한 유저에게 토큰이 발급 된다.")
-    void login_returnsToken(){
-        when(userCredentialRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(credential));
-        when(passwordEncoder.matches("Test1234!", "encoded-password")).thenReturn(true);
-        when(jwtTokenProvider.createJwtToken(eq(user), anyString())).thenReturn(jwtToken);
-
-        LoginResponseDTO response = userService.login(loginRequest);
-
-        assertThat(response.getUserId()).isEqualTo(1L);
-        assertThat(response.getToken()).isEqualTo(jwtToken);
-        assertThat(response.getNickname()).isEqualTo("tester");
-
-        ArgumentCaptor<String> sessionIdCaptor = ArgumentCaptor.forClass(String.class);
-        verify(jwtTokenProvider).createJwtToken(eq(user), sessionIdCaptor.capture());
-        assertThat(sessionIdCaptor.getValue()).isNotBlank();
-        verify(passwordEncoder).matches("Test1234!", "encoded-password");
-    }
-
-    @Test
-    @DisplayName("로그인 성공 시 refresh session을 저장한다.")
-    void login_savesRefreshSession(){
-        when(userCredentialRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(credential));
-        when(passwordEncoder.matches("Test1234!", "encoded-password")).thenReturn(true);
-        when(jwtTokenProvider.createJwtToken(eq(user), anyString())).thenReturn(jwtToken);
-        when(jwtTokenProvider.getRemainingValidityMillis("refresh-token")).thenReturn(604800000L);
-        when(refreshTokenHasher.hash("refresh-token")).thenReturn("refresh-hash");
-
-        userService.login(loginRequest);
-
-        ArgumentCaptor<RefreshSession> sessionCaptor = ArgumentCaptor.forClass(RefreshSession.class);
-        verify(refreshSessionStore).save(sessionCaptor.capture());
-
-        RefreshSession saved = sessionCaptor.getValue();
-        assertThat(saved.userId()).isEqualTo(user.getUserId());
-        assertThat(saved.sessionId()).isNotBlank();
-        assertThat(saved.refreshTokenHash()).isEqualTo("refresh-hash");
-        assertThat(saved.expiresAt()).isAfter(Instant.now());
-    }
-    @Test
-    @DisplayName("이메일이 등록되지 않으면 401")
-    void login_emailNotFound_throwsNotRegisteredException() {
-        when(userCredentialRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> userService.login(loginRequest)).isInstanceOf(NotRegisteredException.class);
-    }
-    @Test
-    @DisplayName("비밀번호가 다르면 401")
-    void login_passwordInvalid_throwsPasswordInvalidException() {
-        loginRequest.setPassword("Wrong1234!");
-
-        when(passwordEncoder.matches("Wrong1234!", "encoded-password")).thenReturn(false);
-        when(userCredentialRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(credential));
-
-        assertThatThrownBy(() -> userService.login(loginRequest)).isInstanceOf(PasswordInvalidException.class);
-    }
-
-    @Test
-    @DisplayName("탈퇴한 유저가 로그인 시도 시 401")
-    void login_withDrawnAccount_throwsNotRegisteredException() {
-        user.withDraw();
-        when(userCredentialRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(credential));
-        assertThatThrownBy(() -> userService.login(loginRequest)).isInstanceOf(NotRegisteredException.class);
     }
 
     @Test

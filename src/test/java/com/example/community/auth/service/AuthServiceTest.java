@@ -1,22 +1,30 @@
 package com.example.community.auth.service;
 
+import com.example.community.auth.dto.LoginRequestDTO;
+import com.example.community.auth.dto.LoginResponseDTO;
 import com.example.community.auth.session.RefreshSession;
 import com.example.community.auth.session.RefreshSessionStore;
 import com.example.community.auth.session.RefreshTokenHasher;
 import com.example.community.global.security.jwt.JwtToken;
 import com.example.community.global.security.jwt.JwtTokenProvider;
+import com.example.community.global.exceptions.NotRegisteredException;
+import com.example.community.global.exceptions.PasswordInvalidException;
 import com.example.community.global.exceptions.UnauthorizedException;
 import com.example.community.user.entity.User;
+import com.example.community.user.entity.UserCredential;
 import com.example.community.user.entity.UserRole;
 import com.example.community.user.entity.UserStatus;
+import com.example.community.user.repository.UserCredentialRepository;
 import com.example.community.user.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -35,20 +43,88 @@ class AuthServiceTest {
     @Mock
     UserRepository userRepository;
     @Mock
+    UserCredentialRepository userCredentialRepository;
+    @Mock
     JwtTokenProvider jwtTokenProvider;
     @Mock
     RefreshSessionStore refreshSessionStore;
     @Mock
     RefreshTokenHasher refreshTokenHasher;
+    @Mock
+    PasswordEncoder passwordEncoder;
 
     @InjectMocks
     AuthService authService;
 
     private User user;
+    private UserCredential credential;
+    private LoginRequestDTO loginRequest;
 
     @BeforeEach
     void setUp() {
         user = new User(1L, "tester", "", UserRole.ROLE_USER, UserStatus.ACTIVE);
+        credential = new UserCredential(user, "test@test.com", "encoded-password");
+        loginRequest = new LoginRequestDTO();
+        loginRequest.setEmail("test@test.com");
+        loginRequest.setPassword("Test1234!");
+    }
+
+    @Test
+    @DisplayName("로그인 성공 시 토큰과 사용자 정보를 반환하고 refresh session을 저장한다.")
+    void login_returnsTokenAndSavesRefreshSession() {
+        JwtToken token = new JwtToken("Bearer", "access-token", "refresh-token");
+        when(userCredentialRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(credential));
+        when(passwordEncoder.matches("Test1234!", "encoded-password")).thenReturn(true);
+        when(jwtTokenProvider.createJwtToken(eq(user), anyString())).thenReturn(token);
+        when(jwtTokenProvider.getRemainingValidityMillis("refresh-token")).thenReturn(604800000L);
+        when(refreshTokenHasher.hash("refresh-token")).thenReturn("refresh-hash");
+
+        LoginResponseDTO response = authService.login(loginRequest);
+
+        assertThat(response.getUserId()).isEqualTo(1L);
+        assertThat(response.getToken()).isEqualTo(token);
+        assertThat(response.getNickname()).isEqualTo("tester");
+
+        ArgumentCaptor<String> sessionIdCaptor = ArgumentCaptor.forClass(String.class);
+        verify(jwtTokenProvider).createJwtToken(eq(user), sessionIdCaptor.capture());
+        verify(refreshSessionStore).save(argThat(session ->
+                session.userId() == user.getUserId()
+                        && session.sessionId().equals(sessionIdCaptor.getValue())
+                        && session.refreshTokenHash().equals("refresh-hash")
+                        && session.expiresAt().isAfter(Instant.now())
+        ));
+    }
+
+    @Test
+    @DisplayName("이메일이 등록되지 않으면 401")
+    void login_emailNotFound_throwsNotRegisteredException() {
+        when(userCredentialRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.login(loginRequest))
+                .isInstanceOf(NotRegisteredException.class);
+        verifyNoInteractions(jwtTokenProvider, refreshSessionStore, refreshTokenHasher);
+    }
+
+    @Test
+    @DisplayName("비밀번호가 다르면 401")
+    void login_passwordInvalid_throwsPasswordInvalidException() {
+        when(userCredentialRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(credential));
+        when(passwordEncoder.matches("Test1234!", "encoded-password")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(loginRequest))
+                .isInstanceOf(PasswordInvalidException.class);
+        verifyNoInteractions(jwtTokenProvider, refreshSessionStore, refreshTokenHasher);
+    }
+
+    @Test
+    @DisplayName("탈퇴한 유저가 로그인 시도하면 401")
+    void login_withdrawnAccount_throwsNotRegisteredException() {
+        user.withDraw();
+        when(userCredentialRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(credential));
+
+        assertThatThrownBy(() -> authService.login(loginRequest))
+                .isInstanceOf(NotRegisteredException.class);
+        verifyNoInteractions(passwordEncoder, jwtTokenProvider, refreshSessionStore, refreshTokenHasher);
     }
 
     @Test
