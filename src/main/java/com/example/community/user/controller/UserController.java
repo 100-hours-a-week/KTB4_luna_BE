@@ -18,12 +18,6 @@ public class UserController {
     public UserController(UserService userService) {
         this.userService = userService;
     }
-    @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<String>> logout(Authentication authentication) {
-        Long loginUserId = getLoginUserId(authentication);
-        userService.logout(loginUserId);
-        return ResponseEntity.ok(new ApiResponse<>("logout_success", null));
-    }
     @PostMapping("/signup")
     public ResponseEntity<ApiResponse<SignUpResponseDTO>> signUp(@Valid @RequestBody SignUpRequestDTO requestDTO) {
         SignUpResponseDTO responseDTO = userService.signUp(requestDTO);

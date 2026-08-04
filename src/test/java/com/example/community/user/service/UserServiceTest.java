@@ -22,7 +22,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.Mockito.*;
@@ -72,12 +71,6 @@ public class UserServiceTest {
         modifyPasswordRequest = new ModifyPasswordRequestDTO();
         modifyPasswordRequest.setPassword("New12345!");
         modifyPasswordRequest.setPasswordConfirm("New12345!");
-    }
-
-    @Test
-    @DisplayName("로그아웃 성공 시 예외가 발생하지 않는다.")
-    void logout_success() {
-        assertThatCode(() -> userService.logout(1L)).doesNotThrowAnyException();
     }
 
     @Test

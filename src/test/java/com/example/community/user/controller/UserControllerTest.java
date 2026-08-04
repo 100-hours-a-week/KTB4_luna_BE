@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -48,28 +49,6 @@ public class UserControllerTest {
                 null,
                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
         );
-    }
-
-    @Test
-    @DisplayName("로그아웃 성공 시 200")
-    void logout_success_returns200() throws Exception {
-        mockMvc.perform(post("/api/users/logout")
-                        .with(authentication(authentication)))
-                .andExpect(status().isOk());
-
-        verify(userService).logout(1L);
-    }
-
-    @Test
-    @DisplayName("로그아웃 시 토큰이 유효하지 않으면 401")
-    void logout_invalidToken_returns401() throws Exception {
-        when(jwtTokenProvider.validateAccessToken("invalid-token")).thenReturn(false);
-
-        mockMvc.perform(post("/api/users/logout")
-                        .header("Authorization", "Bearer invalid-token"))
-                .andExpect(status().isUnauthorized());
-
-        verify(userService, never()).logout(anyLong());
     }
 
     @Test

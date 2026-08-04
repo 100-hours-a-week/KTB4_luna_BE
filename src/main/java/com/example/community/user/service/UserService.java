@@ -35,11 +35,6 @@ public class UserService {
         this.userCredentialFactory = userCredentialFactory;
         this.passwordEncoder = passwordEncoder;
     }
-    // ----------------------------------- 로그아웃, 토큰 삭제 -----------------------------------
-    @Transactional
-    public void logout(Long userId){
-
-    }
     // ----------------------------------- 회원가입(유저 생성) -----------------------------------
     @Transactional
     public SignUpResponseDTO signUp(@Valid SignUpRequestDTO requestDTO){
