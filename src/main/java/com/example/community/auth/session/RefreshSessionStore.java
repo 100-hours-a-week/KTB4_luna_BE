@@ -33,6 +33,16 @@ public class RefreshSessionStore {
             redis.call('SET', KEYS[1], ARGV[2], 'PX', ARGV[3])
             return 1
             """, Long.class);
+    private static final RedisScript<String> REPLACE_SESSION = new DefaultRedisScript<>("""
+            local value = redis.call('GET', KEYS[1])
+            local previousSessionId = ''
+            if value then
+                local session = cjson.decode(value)
+                previousSessionId = session.sessionId
+            end
+            redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
+            return previousSessionId
+            """, String.class);
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -60,6 +70,17 @@ public class RefreshSessionStore {
             return Optional.empty();
         }
         return Optional.of(read(value));
+    }
+
+    public Optional<String> replace(RefreshSession session) {
+        String previousSessionId = redisTemplate.execute(
+                REPLACE_SESSION,
+                List.of(key(session.userId())),
+                write(session),
+                String.valueOf(ttlMillis(session))
+        );
+        return Optional.ofNullable(previousSessionId)
+                .filter(value -> !value.isBlank());
     }
 
     public boolean deleteIfSessionMatches(long userId, String sessionId) {

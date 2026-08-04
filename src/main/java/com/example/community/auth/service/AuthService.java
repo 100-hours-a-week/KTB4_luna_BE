@@ -10,6 +10,7 @@ import com.example.community.auth.session.RefreshTokenHasher;
 import com.example.community.global.exceptions.NotRegisteredException;
 import com.example.community.global.exceptions.PasswordInvalidException;
 import com.example.community.global.exceptions.UnauthorizedException;
+import com.example.community.realtime.service.RealtimeStreamService;
 import com.example.community.user.entity.User;
 import com.example.community.user.entity.UserCredential;
 import com.example.community.user.repository.UserCredentialRepository;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -32,19 +34,22 @@ public class AuthService {
     private final RefreshSessionStore refreshSessionStore;
     private final RefreshTokenHasher refreshTokenHasher;
     private final PasswordEncoder passwordEncoder;
+    private final RealtimeStreamService realtimeStreamService;
 
     public AuthService(UserCredentialRepository userCredentialRepository,
                        UserRepository userRepository,
                        JwtTokenProvider jwtTokenProvider,
                        RefreshSessionStore refreshSessionStore,
                        RefreshTokenHasher refreshTokenHasher,
-                       PasswordEncoder passwordEncoder) {
+                       PasswordEncoder passwordEncoder,
+                       RealtimeStreamService realtimeStreamService) {
         this.userCredentialRepository = userCredentialRepository;
         this.userRepository = userRepository;
         this.jwtTokenProvider = jwtTokenProvider;
         this.refreshSessionStore = refreshSessionStore;
         this.refreshTokenHasher = refreshTokenHasher;
         this.passwordEncoder = passwordEncoder;
+        this.realtimeStreamService = realtimeStreamService;
     }
 
     @Transactional
@@ -62,12 +67,13 @@ public class AuthService {
 
         JwtToken token = jwtTokenProvider.createJwtToken(user, sessionId);
         long refreshValidityMillis = jwtTokenProvider.getRemainingValidityMillis(token.getRefreshToken());
-        refreshSessionStore.save(new RefreshSession(
+        Optional<String> previousSessionId = refreshSessionStore.replace(new RefreshSession(
                 user.getUserId(),
                 sessionId,
                 refreshTokenHasher.hash(token.getRefreshToken()),
                 Instant.now().plusMillis(refreshValidityMillis)
         ));
+        previousSessionId.ifPresent(realtimeStreamService::sendSessionReplaced);
 
         return new LoginResponseDTO(user.getUserId(), token, user.getNickname(), user.getProfileImageUrl());
     }
