@@ -64,7 +64,6 @@ public class PostDraftServiceTest {
 
     PostDraft draft;
     Post post;
-    JwtToken jwtToken;
 
     PostDraftRequestDTO requestDTO;
     PostDraftRequestDTO overwriteRequestDTO;

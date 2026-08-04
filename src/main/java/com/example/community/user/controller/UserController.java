@@ -2,13 +2,11 @@ package com.example.community.user.controller;
 
 import com.example.community.global.ApiResponse;
 import com.example.community.user.dto.*;
-import com.example.community.user.entity.UserRole;
 import com.example.community.user.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 
 
