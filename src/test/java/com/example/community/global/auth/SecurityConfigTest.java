@@ -1,12 +1,12 @@
 package com.example.community.global.auth;
 
 import com.example.community.global.config.SecurityConfig;
+import com.example.community.auth.dto.LoginResponseDTO;
 import com.example.community.global.controller.AdminController;
 import com.example.community.post.controller.PostController;
 import com.example.community.post.dto.PostPageResponseDTO;
 import com.example.community.post.service.PostService;
 import com.example.community.user.controller.UserController;
-import com.example.community.user.dto.LoginResponseDTO;
 import com.example.community.user.dto.SignUpRequestDTO;
 import com.example.community.user.dto.SignUpResponseDTO;
 import com.example.community.user.entity.User;

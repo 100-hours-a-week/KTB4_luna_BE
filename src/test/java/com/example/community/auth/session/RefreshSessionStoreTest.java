@@ -1,4 +1,4 @@
-package com.example.community.global.auth.session;
+package com.example.community.auth.session;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

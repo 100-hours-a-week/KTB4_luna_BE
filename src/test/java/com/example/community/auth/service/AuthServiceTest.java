@@ -1,10 +1,10 @@
-package com.example.community.global.auth.service;
+package com.example.community.auth.service;
 
+import com.example.community.auth.session.RefreshSession;
+import com.example.community.auth.session.RefreshSessionStore;
+import com.example.community.auth.session.RefreshTokenHasher;
 import com.example.community.global.auth.JwtToken;
 import com.example.community.global.auth.JwtTokenProvider;
-import com.example.community.global.auth.session.RefreshSession;
-import com.example.community.global.auth.session.RefreshSessionStore;
-import com.example.community.global.auth.session.RefreshTokenHasher;
 import com.example.community.global.exceptions.UnauthorizedException;
 import com.example.community.user.entity.User;
 import com.example.community.user.entity.UserRole;
