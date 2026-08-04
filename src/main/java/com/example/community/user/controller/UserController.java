@@ -1,6 +1,8 @@
 package com.example.community.user.controller;
 
 import com.example.community.global.ApiResponse;
+import com.example.community.auth.dto.LoginRequestDTO;
+import com.example.community.auth.dto.LoginResponseDTO;
 import com.example.community.user.dto.*;
 import com.example.community.user.entity.UserRole;
 import com.example.community.user.service.UserService;

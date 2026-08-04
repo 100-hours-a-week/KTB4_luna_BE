@@ -1,4 +1,4 @@
-package com.example.community.user.dto;
+package com.example.community.auth.dto;
 
 import com.example.community.global.auth.JwtToken;
 import lombok.AllArgsConstructor;
