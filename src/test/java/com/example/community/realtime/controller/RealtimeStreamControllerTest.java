@@ -65,6 +65,8 @@ class RealtimeStreamControllerTest {
                 null,
                 List.of(new SimpleGrantedAuthority("ROLE_USER"))
         );
+        when(jwtTokenProvider.validateAccessToken("access-token")).thenReturn(true);
+        when(jwtTokenProvider.getAuthentication("access-token")).thenReturn(authentication);
         when(realtimeStreamService.connect(eq(1L), any(SseEmitter.class)))
                 .thenAnswer(invocation -> invocation.getArgument(1));
     }

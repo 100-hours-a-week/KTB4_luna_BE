@@ -55,7 +55,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ApiResponse<>("password_invalid", errors));
     }
 
-    // 401, 비로그인, 토큰 만료 등 권한 없음
+    // 401, 비로그인이나 토큰이 요청에 없는 경우
     @ExceptionHandler(UnauthorizedException.class)
     public ResponseEntity<ApiResponse<Map<String, String>>> handleUnauthorizedException(UnauthorizedException e) {
         Map<String, String> errors = new HashMap<>();

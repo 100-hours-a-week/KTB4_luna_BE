@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -13,12 +14,13 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 @Component
 @RequiredArgsConstructor
 public class JwtFilter extends OncePerRequestFilter {
 
-    private final JwtTokenProvider jwtTokenProvider; // JWT 생성/검증 로직이 든 클래스
+    private final JwtTokenProvider jwtTokenProvider;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -28,15 +30,34 @@ public class JwtFilter extends OncePerRequestFilter {
         // 1. 헤더에서 토큰 추출
         String token = resolveToken(request);
 
-        // 2. 토큰 유효성 검사
-        if (token != null && jwtTokenProvider.validateAccessToken(token)) {
-            // 3. 토큰이 유효하면 Authentication 객체를 가져와서 SecurityContext에 저장
-            Authentication authentication = jwtTokenProvider.getAuthentication(token);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+        if (token != null) {
+            if (jwtTokenProvider.validateAccessToken(token)) {
+                Authentication authentication = jwtTokenProvider.getAuthentication(token);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } else {
+                writeUnauthorizedResponse(response, getTokenErrorMessage(token));
+                return;
+            }
         }
 
-        // 4. 다음 필터로 진행
         filterChain.doFilter(request, response);
+    }
+
+    private String getTokenErrorMessage(String token) {
+        try {
+            return jwtTokenProvider.getRemainingValidityMillis(token) == 0L
+                    ? "access_token_expired"
+                    : "access_token_invalid";
+        } catch (Exception exception) {
+            return "access_token_invalid";
+        }
+    }
+
+    private void writeUnauthorizedResponse(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.getWriter().write("{\"message\":\"" + message + "\",\"data\":null}");
     }
 
     private String resolveToken(HttpServletRequest request) {

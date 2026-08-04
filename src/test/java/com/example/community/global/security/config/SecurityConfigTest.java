@@ -33,6 +33,8 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = {AuthController.class, UserController.class, PostController.class, AdminController.class})
@@ -82,7 +84,10 @@ public class SecurityConfigTest {
     @Test
     @DisplayName("그 외 엔드포인트들은 인증이 필요하다.")
     void otherRequest_deniedWithoutAuthentication() throws Exception {
-        mockMvc.perform(get("/api/posts")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/posts"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("unauthorized_user"));
     }
 
     @Test
@@ -90,7 +95,7 @@ public class SecurityConfigTest {
     void otherRequest_canBeAccessedWithAuthentication() throws Exception{
         when(postService.getPostList(0)).thenReturn(new PostPageResponseDTO(List.of(), 0, 20, 0, 0));
 
-        mockMvc.perform(get("/api/posts").with(user("test")).header("Authorization", "Bearer access-token")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/posts").with(user("test"))).andExpect(status().isOk());
     }
 
     @Test
