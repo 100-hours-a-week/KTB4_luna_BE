@@ -29,6 +29,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import java.time.Instant;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -186,5 +187,26 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.refresh(refreshToken))
                 .isInstanceOf(UnauthorizedException.class);
         verify(refreshSessionStore, never()).rotateIfHashMatches(anyLong(), anyString(), any(RefreshSession.class));
+    }
+
+    @Test
+    @DisplayName("logout은 userId와 sessionId가 일치하는 세션을 삭제한다.")
+    void logout_deletesMatchingSession() {
+        when(refreshSessionStore.deleteIfSessionMatches(1L, "session-1")).thenReturn(true);
+
+        authService.logout(1L, "session-1");
+
+        verify(refreshSessionStore).deleteIfSessionMatches(1L, "session-1");
+    }
+
+    @Test
+    @DisplayName("이전 session의 늦은 logout은 새 session을 삭제하지 않고 성공한다.")
+    void logout_withStaleSession_doesNotDeleteCurrentSession() {
+        when(refreshSessionStore.deleteIfSessionMatches(1L, "old-session")).thenReturn(false);
+
+        assertThatCode(() -> authService.logout(1L, "old-session")).doesNotThrowAnyException();
+
+        verify(refreshSessionStore).deleteIfSessionMatches(1L, "old-session");
+        verifyNoMoreInteractions(refreshSessionStore);
     }
 }

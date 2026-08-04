@@ -18,6 +18,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,6 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -210,5 +214,38 @@ class AuthControllerTest {
                         )));
 
         verify(authService).refresh("invalid-refresh-token");
+    }
+
+    @Test
+    @DisplayName("logout은 현재 Access Token session을 종료하고 refresh cookie를 만료한다.")
+    void logout_success_deletesSessionAndExpiresCookie() throws Exception {
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                "1",
+                null,
+                java.util.List.of(new SimpleGrantedAuthority("ROLE_USER"))
+        );
+        when(jwtTokenProvider.getSessionId("access-token")).thenReturn("session-1");
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .with(authentication(authentication))
+                        .with(request -> {
+                            request.setUserPrincipal(authentication);
+                            return request;
+                        })
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("logout_success"))
+                .andExpect(header().string(HttpHeaders.SET_COOKIE,
+                        allOf(
+                                containsString("refresh_token="),
+                                containsString("Max-Age=0"),
+                                containsString("Path=/api/auth"),
+                                containsString("HttpOnly"),
+                                containsString("SameSite=Lax"),
+                                containsString("Secure")
+                        )));
+
+        verify(jwtTokenProvider).getSessionId("access-token");
+        verify(authService).logout(1L, "session-1");
     }
 }
