@@ -4,15 +4,15 @@ import com.example.community.auth.dto.LoginRequestDTO;
 import com.example.community.auth.dto.LoginResponseDTO;
 import com.example.community.auth.service.AuthService;
 import com.example.community.global.ApiResponse;
+import com.example.community.global.exceptions.UnauthorizedException;
+import com.example.community.global.security.jwt.JwtToken;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
 
@@ -53,5 +53,42 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
                 .body(new ApiResponse<>("user_login_success", responseDTO));
+    }
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<JwtToken>> refresh(@CookieValue(name = "${jwt.refresh-cookie-name}", required = false) String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .header(HttpHeaders.SET_COOKIE, expiredRefreshCookie().toString())
+                    .body(new ApiResponse<>("refresh_token_missing", null));
+        }
+
+        try {
+            JwtToken jwtToken = authService.refresh(refreshToken);
+            ResponseCookie refreshCookie = ResponseCookie.from(refreshCookieName, jwtToken.getRefreshToken())
+                    .httpOnly(true)
+                    .secure(refreshCookieSecure)
+                    .sameSite(refreshCookieSameSite)
+                    .path(refreshCookiePath)
+                    .maxAge(Duration.ofMillis(refreshTokenExpirationMs))
+                    .build();
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                    .body(new ApiResponse<>("token_refresh_success", jwtToken));
+        } catch (UnauthorizedException exception) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .header(HttpHeaders.SET_COOKIE, expiredRefreshCookie().toString())
+                    .body(new ApiResponse<>("refresh_token_invalid", null));
+        }
+    }
+
+    private ResponseCookie expiredRefreshCookie() {
+        return ResponseCookie.from(refreshCookieName, "")
+                .httpOnly(true)
+                .secure(refreshCookieSecure)
+                .sameSite(refreshCookieSameSite)
+                .path(refreshCookiePath)
+                .maxAge(Duration.ZERO)
+                .build();
     }
 }
