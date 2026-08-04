@@ -67,8 +67,9 @@ class RealtimeStreamControllerTest {
         );
         when(jwtTokenProvider.validateAccessToken("access-token")).thenReturn(true);
         when(jwtTokenProvider.getAuthentication("access-token")).thenReturn(authentication);
-        when(realtimeStreamService.connect(eq(1L), any(SseEmitter.class)))
-                .thenAnswer(invocation -> invocation.getArgument(1));
+        when(jwtTokenProvider.getSessionId("access-token")).thenReturn("session-1");
+        when(realtimeStreamService.connect(eq(1L), eq("session-1"), any(SseEmitter.class)))
+                .thenAnswer(invocation -> invocation.getArgument(2));
     }
 
     @Test
@@ -85,7 +86,9 @@ class RealtimeStreamControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM));
 
         ArgumentCaptor<SseEmitter> emitterCaptor = ArgumentCaptor.forClass(SseEmitter.class);
-        verify(realtimeStreamService).connect(eq(1L), emitterCaptor.capture());
+        verify(realtimeStreamService).connect(
+                eq(1L), eq("session-1"), emitterCaptor.capture()
+        );
         assertThat(emitterCaptor.getValue().getTimeout()).isEqualTo(10_000L);
         emitterCaptor.getValue().complete();
     }
@@ -104,7 +107,9 @@ class RealtimeStreamControllerTest {
                 .andExpect(request().asyncStarted());
 
         ArgumentCaptor<SseEmitter> emitterCaptor = ArgumentCaptor.forClass(SseEmitter.class);
-        verify(realtimeStreamService).connect(eq(1L), emitterCaptor.capture());
+        verify(realtimeStreamService).connect(
+                eq(1L), eq("session-1"), emitterCaptor.capture()
+        );
         assertThat(emitterCaptor.getValue().getTimeout()).isEqualTo(MAX_CONNECTION_TIMEOUT_MILLIS);
         emitterCaptor.getValue().complete();
     }

@@ -104,7 +104,7 @@ class RealtimeCommentEventIntegrationTest {
     @Test
     @DisplayName("실제 댓글·대댓글 생성 commit 후 최소 식별자를 전달한다")
     void uploadCommentPublishesCommentCreatedAfterCommit() throws Exception {
-        realtimeStreamService.connect(recipient.getUserId(), recipientEmitter);
+        realtimeStreamService.connect(recipient.getUserId(), "session-recipient", recipientEmitter);
         RealtimeConnection connection = registry.findAll().stream()
                 .findFirst()
                 .orElseThrow();
