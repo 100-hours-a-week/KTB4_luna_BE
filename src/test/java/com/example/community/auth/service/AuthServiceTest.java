@@ -16,6 +16,7 @@ import com.example.community.user.entity.UserRole;
 import com.example.community.user.entity.UserStatus;
 import com.example.community.user.repository.UserCredentialRepository;
 import com.example.community.user.repository.UserRepository;
+import com.example.community.realtime.service.RealtimeStreamService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,8 @@ class AuthServiceTest {
     RefreshTokenHasher refreshTokenHasher;
     @Mock
     PasswordEncoder passwordEncoder;
+    @Mock
+    RealtimeStreamService realtimeStreamService;
 
     @InjectMocks
     AuthService authService;
@@ -88,12 +91,29 @@ class AuthServiceTest {
 
         ArgumentCaptor<String> sessionIdCaptor = ArgumentCaptor.forClass(String.class);
         verify(jwtTokenProvider).createJwtToken(eq(user), sessionIdCaptor.capture());
-        verify(refreshSessionStore).save(argThat(session ->
+        verify(refreshSessionStore).replace(argThat(session ->
                 session.userId() == user.getUserId()
                         && session.sessionId().equals(sessionIdCaptor.getValue())
                         && session.refreshTokenHash().equals("refresh-hash")
                         && session.expiresAt().isAfter(Instant.now())
         ));
+        verifyNoInteractions(realtimeStreamService);
+    }
+
+    @Test
+    @DisplayName("로그인 시 기존 session이 교체되면 이전 session의 SSE 연결을 종료한다")
+    void login_replacesExistingSessionAndNotifiesPreviousSession() {
+        JwtToken token = new JwtToken("Bearer", "access-token", "refresh-token");
+        when(userCredentialRepository.findByEmail(loginRequest.getEmail())).thenReturn(Optional.of(credential));
+        when(passwordEncoder.matches("Test1234!", "encoded-password")).thenReturn(true);
+        when(jwtTokenProvider.createJwtToken(eq(user), anyString())).thenReturn(token);
+        when(jwtTokenProvider.getRemainingValidityMillis("refresh-token")).thenReturn(604800000L);
+        when(refreshTokenHasher.hash("refresh-token")).thenReturn("refresh-hash");
+        when(refreshSessionStore.replace(any(RefreshSession.class))).thenReturn(Optional.of("old-session"));
+
+        authService.login(loginRequest);
+
+        verify(realtimeStreamService).sendSessionReplaced("old-session");
     }
 
     @Test

@@ -68,6 +68,34 @@ class RefreshSessionStoreTest {
     }
 
     @Test
+    @DisplayName("새 세션으로 원자 교체하고 기존 sessionId를 반환한다")
+    void replacesSessionAndReturnsPreviousSessionId() {
+        RefreshSession replacement = session("hash-2", EXPIRES_AT);
+        when(redisTemplate.execute(
+                ArgumentMatchers.<RedisScript<String>>any(),
+                eq(List.of(KEY)),
+                any(String.class),
+                any(String.class)
+        )).thenReturn("old-session");
+
+        assertThat(store.replace(replacement)).contains("old-session");
+    }
+
+    @Test
+    @DisplayName("기존 세션이 없으면 교체 결과가 비어 있다")
+    void replacesMissingSessionWithEmptyPreviousSessionId() {
+        RefreshSession replacement = session("hash-2", EXPIRES_AT);
+        when(redisTemplate.execute(
+                ArgumentMatchers.<RedisScript<String>>any(),
+                eq(List.of(KEY)),
+                any(String.class),
+                any(String.class)
+        )).thenReturn(null);
+
+        assertThat(store.replace(replacement)).isEmpty();
+    }
+
+    @Test
     @DisplayName("사용자 키로 저장된 세션을 조회한다")
     void findsSessionByUserId() throws Exception {
         RefreshSession expected = session(REFRESH_TOKEN_HASH, EXPIRES_AT);
