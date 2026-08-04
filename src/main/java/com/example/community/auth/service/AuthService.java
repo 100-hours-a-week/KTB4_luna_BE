@@ -71,6 +71,10 @@ public class AuthService {
 
         return new LoginResponseDTO(user.getUserId(), token, user.getNickname(), user.getProfileImageUrl());
     }
+    
+    public void logout(long userId, String sessionId){
+        refreshSessionStore.deleteIfSessionMatches(userId, sessionId);
+    }
 
     public JwtToken refresh(String refreshToken){
         if (refreshToken == null || refreshToken.isBlank() || !jwtTokenProvider.validateRefreshToken(refreshToken)) {
