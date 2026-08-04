@@ -1,6 +1,6 @@
 package com.example.community.realtime.service;
 
-import com.example.community.global.auth.AuthValidator;
+import com.example.community.global.security.AuthValidator;
 import com.example.community.global.exceptions.ContentNotFoundException;
 import com.example.community.global.exceptions.InvalidInputException;
 import com.example.community.realtime.connection.RealtimeConnection;

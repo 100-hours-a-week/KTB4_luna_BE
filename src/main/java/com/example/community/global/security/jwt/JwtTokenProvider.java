@@ -1,4 +1,4 @@
-package com.example.community.global.auth;
+package com.example.community.global.security.jwt;
 
 import com.example.community.user.entity.User;
 import io.jsonwebtoken.Claims;

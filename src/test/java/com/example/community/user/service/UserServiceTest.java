@@ -1,11 +1,13 @@
 package com.example.community.user.service;
 
-import com.example.community.global.auth.*;
 import com.example.community.auth.dto.LoginRequestDTO;
 import com.example.community.auth.dto.LoginResponseDTO;
 import com.example.community.auth.session.RefreshSession;
 import com.example.community.auth.session.RefreshSessionStore;
 import com.example.community.auth.session.RefreshTokenHasher;
+import com.example.community.global.security.AuthValidator;
+import com.example.community.global.security.jwt.JwtToken;
+import com.example.community.global.security.jwt.JwtTokenProvider;
 import com.example.community.global.exceptions.*;
 import com.example.community.user.dto.*;
 import com.example.community.user.entity.User;

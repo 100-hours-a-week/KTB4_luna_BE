@@ -1,4 +1,4 @@
-package com.example.community.global.auth;
+package com.example.community.global.security;
 
 import com.example.community.global.exceptions.ForbiddenException;
 import com.example.community.global.exceptions.UnauthorizedException;

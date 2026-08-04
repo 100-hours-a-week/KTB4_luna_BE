@@ -1,6 +1,6 @@
-package com.example.community.global.config;
+package com.example.community.global.security.config;
 
-import com.example.community.global.config.filter.JwtFilter;
+import com.example.community.global.security.filter.JwtFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;

@@ -1,6 +1,6 @@
 package com.example.community.auth.controller;
 
-import com.example.community.global.auth.JwtToken;
+import com.example.community.global.security.jwt.JwtToken;
 import com.example.community.auth.service.AuthService;
 import com.example.community.global.exceptions.GlobalExceptionHandler;
 import com.example.community.global.exceptions.UnauthorizedException;

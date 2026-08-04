@@ -1,6 +1,6 @@
-package com.example.community.global.config.filter;
+package com.example.community.global.security.filter;
 
-import com.example.community.global.auth.JwtTokenProvider;
+import com.example.community.global.security.jwt.JwtTokenProvider;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

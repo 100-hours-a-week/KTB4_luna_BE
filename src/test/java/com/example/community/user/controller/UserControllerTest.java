@@ -1,11 +1,11 @@
 package com.example.community.user.controller;
 
-import com.example.community.global.auth.JwtToken;
-import com.example.community.global.auth.JwtTokenProvider;
+import com.example.community.global.security.jwt.JwtToken;
+import com.example.community.global.security.jwt.JwtTokenProvider;
 import com.example.community.auth.dto.LoginRequestDTO;
 import com.example.community.auth.dto.LoginResponseDTO;
-import com.example.community.global.config.SecurityConfig;
-import com.example.community.global.config.filter.JwtFilter;
+import com.example.community.global.security.config.SecurityConfig;
+import com.example.community.global.security.filter.JwtFilter;
 import com.example.community.global.exceptions.*;
 import com.example.community.user.dto.*;
 import com.example.community.user.service.UserService;

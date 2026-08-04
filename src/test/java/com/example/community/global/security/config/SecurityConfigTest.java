@@ -1,6 +1,7 @@
-package com.example.community.global.auth;
+package com.example.community.global.security.config;
 
-import com.example.community.global.config.SecurityConfig;
+import com.example.community.global.security.jwt.JwtToken;
+import com.example.community.global.security.jwt.JwtTokenProvider;
 import com.example.community.auth.dto.LoginResponseDTO;
 import com.example.community.global.controller.AdminController;
 import com.example.community.post.controller.PostController;

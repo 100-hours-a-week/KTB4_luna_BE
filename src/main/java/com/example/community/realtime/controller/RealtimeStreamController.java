@@ -1,7 +1,7 @@
 package com.example.community.realtime.controller;
 
 import com.example.community.global.ApiResponse;
-import com.example.community.global.auth.JwtTokenProvider;
+import com.example.community.global.security.jwt.JwtTokenProvider;
 import com.example.community.realtime.dto.RealtimeInterestRequestDTO;
 import com.example.community.realtime.service.RealtimeStreamService;
 import jakarta.validation.Valid;

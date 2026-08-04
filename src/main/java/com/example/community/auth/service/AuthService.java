@@ -1,7 +1,7 @@
 package com.example.community.auth.service;
 
-import com.example.community.global.auth.JwtToken;
-import com.example.community.global.auth.JwtTokenProvider;
+import com.example.community.global.security.jwt.JwtToken;
+import com.example.community.global.security.jwt.JwtTokenProvider;
 import com.example.community.auth.session.RefreshSession;
 import com.example.community.auth.session.RefreshSessionStore;
 import com.example.community.auth.session.RefreshTokenHasher;
