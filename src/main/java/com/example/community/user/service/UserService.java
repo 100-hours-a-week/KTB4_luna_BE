@@ -1,5 +1,6 @@
 package com.example.community.user.service;
 
+import com.example.community.auth.session.RefreshSessionStore;
 import com.example.community.global.security.AuthValidator;
 import com.example.community.global.exceptions.*;
 import com.example.community.user.dto.*;
@@ -26,14 +27,16 @@ public class UserService {
     private final UserFactory userFactory;
     private final UserCredentialFactory userCredentialFactory;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshSessionStore refreshSessionStore;
 
-    public UserService(UserRepository userRepository, UserCredentialRepository userCredentialRepository, AuthValidator authValidator, UserFactory userFactory, UserCredentialFactory userCredentialFactory, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, UserCredentialRepository userCredentialRepository, AuthValidator authValidator, UserFactory userFactory, UserCredentialFactory userCredentialFactory, PasswordEncoder passwordEncoder, RefreshSessionStore refreshSessionStore) {
         this.userRepository = userRepository;
         this.userCredentialRepository = userCredentialRepository;
         this.authValidator = authValidator;
         this.userFactory = userFactory;
         this.userCredentialFactory = userCredentialFactory;
         this.passwordEncoder = passwordEncoder;
+        this.refreshSessionStore = refreshSessionStore;
     }
     // ----------------------------------- 회원가입(유저 생성) -----------------------------------
     @Transactional
@@ -78,6 +81,7 @@ public class UserService {
         authValidator.validateOwner(loginUserId, targetUserId);
         User user = userRepository.findById(targetUserId).orElseThrow(NotRegisteredException::new);
         user.withDraw();
+        refreshSessionStore.deleteByUserId(targetUserId);
         return new WithdrawResponseDTO(LocalDateTime.now());
     }
 }

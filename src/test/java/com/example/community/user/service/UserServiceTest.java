@@ -2,6 +2,7 @@ package com.example.community.user.service;
 
 import com.example.community.global.security.AuthValidator;
 import com.example.community.global.exceptions.*;
+import com.example.community.auth.session.RefreshSessionStore;
 import com.example.community.user.dto.*;
 import com.example.community.user.entity.User;
 import com.example.community.user.entity.UserCredential;
@@ -41,6 +42,8 @@ public class UserServiceTest {
 
     @Mock
     PasswordEncoder passwordEncoder;
+    @Mock
+    RefreshSessionStore refreshSessionStore;
 
     @InjectMocks
     UserService userService;
@@ -185,6 +188,7 @@ public class UserServiceTest {
         assertThat(user.getStatus()).isEqualTo(UserStatus.WITHDRAWN);
 
         verify(authValidator).validateOwner(1L, 1L);
+        verify(refreshSessionStore).deleteByUserId(1L);
     }
     @Test
     @DisplayName("다른 사람의 id로 탈퇴를 시도 하면 403")

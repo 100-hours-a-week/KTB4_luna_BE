@@ -92,6 +92,10 @@ public class RefreshSessionStore {
         return Long.valueOf(1L).equals(result);
     }
 
+    public boolean deleteByUserId(long userId){
+        return Boolean.TRUE.equals(redisTemplate.delete(key(userId)));
+    }
+
     public boolean rotateIfHashMatches(long userId, String currentHash, RefreshSession replacement) {
         Long result = redisTemplate.execute(
                 ROTATE_IF_HASH_MATCHES,

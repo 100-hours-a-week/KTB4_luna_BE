@@ -133,6 +133,15 @@ class RefreshSessionStoreTest {
     }
 
     @Test
+    @DisplayName("사용자 기준으로 현재 refresh session을 삭제한다")
+    void deletesSessionByUserId() {
+        when(redisTemplate.delete(KEY)).thenReturn(true);
+
+        assertThat(store.deleteByUserId(USER_ID)).isTrue();
+        verify(redisTemplate).delete(KEY);
+    }
+
+    @Test
     @DisplayName("기존 refresh hash가 일치할 때만 Rotation한다")
     void rotatesOnlyWhenRefreshHashMatches() {
         RefreshSession replacement = session("hash-2", EXPIRES_AT);
