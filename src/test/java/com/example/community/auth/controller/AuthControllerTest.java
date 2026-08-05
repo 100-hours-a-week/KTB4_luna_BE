@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.RedisConnectionFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -152,6 +153,24 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("로그인 중 Redis 장애는 503으로 반환한다.")
+    void login_redisUnavailable_returns503() throws Exception {
+        when(authService.login(any(LoginRequestDTO.class)))
+                .thenThrow(new RedisConnectionFailureException("redis unavailable"));
+
+        mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "email": "test@test.com",
+                              "password": "Test1234!"
+                            }
+                        """))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.message").value("session_unavailable"));
+    }
+
+    @Test
     @DisplayName("refresh는 access token 없이 refresh cookie만으로 새 access token을 반환한다.")
     void refresh_withoutAccessToken_returnsAccessToken() throws Exception {
         JwtToken rotatedToken = new JwtToken("Bearer", "new-access-token", "new-refresh-token");
@@ -217,6 +236,19 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("refresh 중 Redis 장애는 503으로 반환하고 cookie를 유지한다.")
+    void refresh_redisUnavailable_returns503() throws Exception {
+        when(authService.refresh("refresh-token"))
+                .thenThrow(new RedisConnectionFailureException("redis unavailable"));
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .cookie(new Cookie("refresh_token", "refresh-token")))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.message").value("session_unavailable"))
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE));
+    }
+
+    @Test
     @DisplayName("logout은 현재 Access Token session을 종료하고 refresh cookie를 만료한다.")
     void logout_success_deletesSessionAndExpiresCookie() throws Exception {
         Authentication authentication = new UsernamePasswordAuthenticationToken(
@@ -247,5 +279,28 @@ class AuthControllerTest {
 
         verify(jwtTokenProvider).getSessionId("access-token");
         verify(authService).logout(1L, "session-1");
+    }
+
+    @Test
+    @DisplayName("logout 중 Redis 장애는 503으로 반환한다.")
+    void logout_redisUnavailable_returns503() throws Exception {
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                "1",
+                null,
+                java.util.List.of(new SimpleGrantedAuthority("ROLE_USER"))
+        );
+        when(jwtTokenProvider.getSessionId("access-token")).thenReturn("session-1");
+        doThrow(new RedisConnectionFailureException("redis unavailable"))
+                .when(authService).logout(1L, "session-1");
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .with(authentication(authentication))
+                        .with(request -> {
+                            request.setUserPrincipal(authentication);
+                            return request;
+                        })
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.message").value("session_unavailable"));
     }
 }
