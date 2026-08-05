@@ -33,7 +33,10 @@ public class RealtimeStreamService {
         String connectionId = connection.getConnectionId();
         try {
             sseEmitter.onCompletion(() -> registry.remove(connectionId, sseEmitter));
-            sseEmitter.onTimeout(() -> registry.remove(connectionId, sseEmitter));
+            sseEmitter.onTimeout(() -> {
+                registry.remove(connectionId, sseEmitter);
+                sseEmitter.complete();
+            });
             sseEmitter.onError(error -> registry.remove(connectionId, sseEmitter));
             sseEmitter.send(SseEmitter.event()
                     .name("connected")

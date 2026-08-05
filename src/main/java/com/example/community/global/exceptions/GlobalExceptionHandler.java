@@ -9,6 +9,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -101,6 +102,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleRedisUnavailableException(RuntimeException e) {
         return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
                 .body(new ApiResponse<>("session_unavailable", null));
+    }
+
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleDisconnectedClient(AsyncRequestNotUsableException exception) {
+
     }
 
     // 500, 내부 서버 오류
