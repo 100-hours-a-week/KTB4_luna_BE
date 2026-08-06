@@ -32,6 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -207,6 +208,103 @@ class PostControllerTest {
 
         verifyNoInteractions(postService);
     }
+
+    @Test
+    @DisplayName("게시글 목록 page는 backend 0~99 범위만 허용한다")
+    void getPostList_pageOver99_returns400() throws Exception {
+        mockMvc.perform(get("/api/posts")
+                        .param("page", "100")
+                        .with(authentication(userAuthentication)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("invalid_input"));
+
+        verifyNoInteractions(postService);
+    }
+
+    @Test
+    @DisplayName("offset page 99 응답은 다음 cursor를 제공한다")
+    void getPostList_page99_returnsNextBefore() throws Exception {
+        PostPageResponseDTO page100Response = new PostPageResponseDTO(
+                List.of(postListResponseDTO),
+                99,
+                20,
+                2001,
+                101
+        );
+        when(postService.getPostList(99)).thenReturn(page100Response);
+
+        mockMvc.perform(get("/api/posts")
+                        .param("page", "99")
+                        .with(authentication(userAuthentication)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.page").value(99))
+                .andExpect(jsonPath("$.data.nextBefore").isNotEmpty());
+
+        verify(postService).getPostList(99);
+    }
+
+    @Test
+    @DisplayName("before 조회는 cursor 날짜를 제공한다")
+    void getPostList_before_returnsCursorCreatedAt() throws Exception {
+        when(postService.getPostList(0)).thenReturn(postPageResponseDTO);
+
+        mockMvc.perform(get("/api/posts")
+                        .param("before", "opaque-cursor")
+                        .with(authentication(userAuthentication)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("posts_loading_success"))
+                .andExpect(jsonPath("$.data.cursorCreatedAt").isNotEmpty());
+    }
+
+    @Test
+    @DisplayName("마지막 cursor 응답의 nextBefore는 null이다")
+    void getPostList_lastCursor_returnsNullNextBefore() throws Exception {
+        when(postService.getPostList(0)).thenReturn(postPageResponseDTO);
+
+        mockMvc.perform(get("/api/posts")
+                        .param("before", "opaque-cursor")
+                        .with(authentication(userAuthentication)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.nextBefore").value(nullValue()));
+    }
+
+    @Test
+    @DisplayName("page와 before를 함께 보내면 400")
+    void getPostList_pageAndBefore_returns400() throws Exception {
+        mockMvc.perform(get("/api/posts")
+                        .param("page", "99")
+                        .param("before", "opaque-cursor")
+                        .with(authentication(userAuthentication)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("invalid_input"));
+
+        verifyNoInteractions(postService);
+    }
+
+    @Test
+    @DisplayName("before가 비어 있으면 400")
+    void getPostList_emptyBefore_returns400() throws Exception {
+        mockMvc.perform(get("/api/posts")
+                        .param("before", "")
+                        .with(authentication(userAuthentication)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("invalid_input"));
+
+        verifyNoInteractions(postService);
+    }
+
+    @Test
+    @DisplayName("잘못된 before cursor는 400")
+    void getPostList_invalidBefore_returns400() throws Exception {
+        mockMvc.perform(get("/api/posts")
+                        .param("before", "not-a-valid-cursor")
+                        .with(authentication(userAuthentication)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("invalid_input"));
+
+        verifyNoInteractions(postService);
+    }
+
     @Test
     @DisplayName("게시글 상세 조회 성공 시 200")
     void getPostDetail_success_returns200() throws Exception {
