@@ -52,7 +52,7 @@ public class AuthService {
         this.realtimeStreamService = realtimeStreamService;
     }
 
-    @Transactional
+    @Transactional 
     public LoginResponseDTO login(@Valid LoginRequestDTO requestDTO) {
         String email = requestDTO.getEmail();
         String password = requestDTO.getPassword();
@@ -79,7 +79,9 @@ public class AuthService {
     }
     
     public void logout(long userId, String sessionId){
-        refreshSessionStore.deleteIfSessionMatches(userId, sessionId);
+        if (refreshSessionStore.deleteIfSessionMatches(userId, sessionId)) {
+            realtimeStreamService.closeSessionConnections(sessionId);
+        }
     }
 
     public JwtToken refresh(String refreshToken){
