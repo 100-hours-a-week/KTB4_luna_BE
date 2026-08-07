@@ -25,14 +25,14 @@ jobs:
 
     services:
       mariadb:
-        image: mariadb:11
+        image: mariadb:11.8
         env:
           MARIADB_DATABASE: community_test
           MARIADB_USER: community
           MARIADB_PASSWORD: test-password
           MARIADB_ROOT_PASSWORD: root-password
         ports:
-          - 3307:3306
+          - 3308:3306
         options: >-
           --health-cmd "healthcheck.sh --connect --innodb_initialized"
           --health-interval 10s
