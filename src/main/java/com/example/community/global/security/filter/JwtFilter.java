@@ -26,8 +26,6 @@ public class JwtFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-
-        // 1. 헤더에서 토큰 추출
         String token = resolveToken(request);
 
         if (token != null) {
@@ -66,5 +64,14 @@ public class JwtFilter extends OncePerRequestFilter {
             return bearerToken.substring(7);
         }
         return null;
+    }
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String method = request.getMethod();
+        String uri = request.getRequestURI();
+
+        return "OPTIONS".equals(method) || "POST".equals(method) && (
+                "/api/auth/login".equals(uri) || "/api/auth/refresh".equals(uri) || "/api/users/signup".equals(uri)
+        ) || uri.startsWith("/h2-console/");
     }
 }
