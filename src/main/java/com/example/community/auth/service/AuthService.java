@@ -18,7 +18,6 @@ import com.example.community.user.repository.UserRepository;
 import jakarta.validation.Valid;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -104,9 +103,13 @@ public class AuthService {
         RefreshSession current = refreshSessionStore.findByUserId(userId)
                 .filter(session -> session.userId() == userId
                         && session.sessionId().equals(sessionId)
-                        && session.expiresAt().isAfter(Instant.now())
-                        && sameHash(session.refreshTokenHash(), currentHash))
+                        && session.expiresAt().isAfter(Instant.now()))
                 .orElseThrow(UnauthorizedException::new);
+
+        if(!sameHash(current.refreshTokenHash(), currentHash)){
+            refreshSessionStore.deleteIfSessionMatches(userId, sessionId);
+            throw new UnauthorizedException();
+        }
 
         User user = userRepository.findById(userId)
                 .filter(User::isActive)
@@ -128,7 +131,10 @@ public class AuthService {
                 replacementExpiry
         );
 
-        if (!refreshSessionStore.rotateIfHashMatches(userId, currentHash, replacement)) throw new UnauthorizedException();
+        if (!refreshSessionStore.rotateIfHashMatches(userId, currentHash, replacement)) {
+            refreshSessionStore.deleteIfSessionMatches(userId, sessionId);
+            throw new UnauthorizedException();
+        }
 
         return rotatedToken;
     }
