@@ -52,7 +52,6 @@ public class AuthService {
         this.realtimeStreamService = realtimeStreamService;
     }
 
-    @Transactional 
     public LoginResponseDTO login(@Valid LoginRequestDTO requestDTO) {
         String email = requestDTO.getEmail();
         String password = requestDTO.getPassword();
