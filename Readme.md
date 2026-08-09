@@ -145,6 +145,37 @@ erDiagram
 - MariaDB `EXPLAIN`으로 실행계획 확인
 - HTTP 시간, Service Repository 시간, 순수 SQL 시간을 분리해 측정
 
+### Index 개선
+
+- 개선 전: `idx_posts_status_created_at (post_status, created_at)`, `idx_posts_author_created_at (author_id, created_at)` 사용
+- 개선 후: 게시글 목록의 정렬·페이지 선별을 위해 `idx_posts_list_covering (created_at, post_id, post_status)` 추가
+
+### Query 개선
+
+- 개선 전: `Post` entity와 `author`를 `LEFT JOIN FETCH`한 JPQL 페이지 조회
+- 개선 후: 정렬·상태 조건에 맞는 게시글 ID와 생성일을 먼저 20개 선별한 뒤 `posts`·`users`를 조인하는 native delayed join 적용
+- 목록 응답은 전체 entity 대신 projection으로 조회하고, 전체 개수는 별도 count query로 계산
+
+### Index·Query 개선 전후 측정
+
+MariaDB benchmark 데이터 기준, `repeated_page/measure` 50회 요청의 TTFB를 초 단위로 기록했습니다. 아래 결과는 index와 query를 함께 변경한 전후 비교이며, 각 변경의 단독 기여도는 분리하지 않았습니다.
+
+#### 개선 전 (`baseline`)
+
+| page | mean_seconds | median_seconds | p90_seconds | p95_seconds |
+| ---: | ---: | ---: | ---: | ---: |
+| 100 | 0.096831 | 0.095586 | 0.104772 | 0.110480 |
+| 10000 | 0.307841 | 0.305674 | 0.316363 | 0.324017 |
+| 20000 | 0.377538 | 0.374200 | 0.384314 | 0.400666 |
+
+#### 개선 후 (`query-modified`, index + query 적용)
+
+| page | mean_seconds | median_seconds | p90_seconds | p95_seconds |
+| ---: | ---: | ---: | ---: | ---: |
+| 100 | 0.079566 | 0.081450 | 0.088468 | 0.089487 |
+| 10000 | 0.093697 | 0.092787 | 0.097712 | 0.100515 |
+| 20000 | 0.106548 | 0.107857 | 0.112431 | 0.123801 |
+
 ## Docker/AWS/Github Actions를 통한 배포
 
 1. GitHub Actions에서 Gradle build와 테스트 실행
